@@ -1,0 +1,11 @@
+services:
+  go:
+    build: 
+      dockerfile: Dockerfile
+      context: .
+    user: go
+    working_dir: /home/go
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/home/go
