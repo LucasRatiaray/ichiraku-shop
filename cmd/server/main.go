@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/postgres"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -29,6 +30,10 @@ func main() {
 
 	if err := db.PingContext(ctx); err != nil {
 		log.Fatalf("Failed to ping the database: %v", err)
+	}
+
+	if err := postgres.Migrate(ctx, db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	log.Println("Connected to the database successfully")
