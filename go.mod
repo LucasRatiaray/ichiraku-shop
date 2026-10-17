@@ -1,3 +1,3 @@
 module github.com/LucasRatiaray/ichiraku-shop
 
-go 1.27.1
+go 1.27.0

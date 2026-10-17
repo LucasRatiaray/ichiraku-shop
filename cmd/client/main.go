@@ -1,5 +1,5 @@
 // lance la TUI client en terminal local
-package client
+package main
 
 func main() {
 	

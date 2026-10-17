@@ -1,5 +1,5 @@
 // démarre le serveur HTTP (net/http)
-package server
+package main
 
 func main() {
 	

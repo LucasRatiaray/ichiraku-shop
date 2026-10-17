@@ -1,5 +1,5 @@
 // lance le serveur SSH exposant la TUI admin
-package adminssh
+package main
 
 func main() {
 	
