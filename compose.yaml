@@ -9,9 +9,10 @@ services:
     working_dir: /home/go
     tty: true
     stdin_open: true
+    ports:
+      - "127.0.0.1:8080:8080"
     volumes:
       - .:/home/go
-    env_file: .env
     depends_on:
       db:
         condition: service_healthy

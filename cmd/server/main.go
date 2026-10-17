@@ -1,10 +1,11 @@
-// Command server démarre le serveur HTTP.
+// Command server starts the HTTP server and connects to the database.
 package main
 
 import (
 	"context"
 	"database/sql"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -31,4 +32,22 @@ func main() {
 	}
 
 	log.Println("Connected to the database successfully")
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := &http.Server{
+		Addr:              ":8080",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Println("Listening on port 8080")
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
 }
