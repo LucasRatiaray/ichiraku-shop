@@ -1,0 +1,10 @@
+.env
+.git
+.config/
+.cache/
+
+bin/
+*.exe
+
+.vscode/
+.idea/
