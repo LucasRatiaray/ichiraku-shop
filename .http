@@ -2,3 +2,36 @@
 
 ### Health
 GET {{baseUrl}}/health
+
+### 1. Inscription valide → 201
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "motdepasse123"
+}
+
+### 2. Même email → 409
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "motdepasse123"
+}
+
+### 3. Mot de passe trop court → 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "autre@test.fr",
+  "password": "abc"
+}
+
+### 4. JSON invalide → 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "email": "cassé@test.fr",
