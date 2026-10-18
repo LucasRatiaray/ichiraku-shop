@@ -46,7 +46,7 @@ func (r *VerificationCodeRepository) FindValid(ctx context.Context, userID int64
 
 func (r *VerificationCodeRepository) MarkUsed(ctx context.Context, id int64) error {
 	query := `UPDATE verification_codes SET used_at = now() WHERE id = $1 AND used_at IS NULL`
-	
+
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("mark code used: %w", err)

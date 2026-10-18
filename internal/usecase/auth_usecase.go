@@ -3,25 +3,31 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	users UserRepository
+	users  UserRepository
+	codes  VerificationCodeRepository
+	mailer Mailer
 }
 
-func NewAuthService(users UserRepository) *AuthService {
+func NewAuthService(users UserRepository, codes VerificationCodeRepository, mailer Mailer) *AuthService {
 	return &AuthService{
-		users: users,
+		users:  users,
+		codes:  codes,
+		mailer: mailer,
 	}
 }
 
-func (s *AuthService) Register(ctx context.Context, email string, password string) (domain.User, error) {
+func (s *AuthService) Register(ctx context.Context, email, password string) (domain.User, error) {
 	email = strings.TrimSpace(email)
 	email = strings.ToLower(email)
 
@@ -49,5 +55,63 @@ func (s *AuthService) Register(ctx context.Context, email string, password strin
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
+	code, err := generateCode()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("register: %w", err)
+	}
+
+	vc := domain.VerificationCode{
+		UserID:    u.ID,
+		Code:      code,
+		Purpose:   domain.PurposeConfirm,
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+	}
+
+	if err := s.codes.Create(ctx, &vc); err != nil {
+		return domain.User{}, fmt.Errorf("register: %w", err)
+	}
+
+	if err := s.mailer.SendCode(ctx, u.Email, code, domain.PurposeConfirm); err != nil {
+		return domain.User{}, fmt.Errorf("register: %w", err)
+	}
+
 	return u, nil
+}
+
+func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	u, err := s.users.FindByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("confirm: %w", err)
+	}
+
+	if u.Status != domain.StatusPending {
+		return domain.ErrInvalidCode
+	}
+
+	vc, err := s.codes.FindValid(ctx, u.ID, code, domain.PurposeConfirm)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("confirm: %w", err)
+	}
+
+	err = s.codes.MarkUsed(ctx, vc.ID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("confirm: %w", err)
+	}
+
+	u.Status = domain.StatusActive
+	if err := s.users.Update(ctx, u); err != nil {
+		return fmt.Errorf("confirm: %w", err)
+	}
+	return nil
 }

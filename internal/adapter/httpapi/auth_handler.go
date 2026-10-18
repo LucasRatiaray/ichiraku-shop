@@ -34,8 +34,13 @@ type userResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type confirmRequest struct {
+	Email string `json:"email"`
+	Code	string `json:"code"`
+}
+
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
 
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -64,4 +69,27 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Status:    string(user.Status),
 		CreatedAt: user.CreatedAt,
 	})
+}
+
+func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+
+	var req confirmRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	err := h.auth.Confirm(r.Context(), req.Email, req.Code)
+	switch {
+	case errors.Is(err, domain.ErrInvalidCode):
+		writeError(w, http.StatusBadRequest, "invalid or expired code")
+		return
+	case err != nil:
+		log.Printf("confirm: %v", err)
+		writeError(w,http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

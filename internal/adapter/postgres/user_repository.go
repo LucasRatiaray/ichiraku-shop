@@ -47,7 +47,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 		}
 		return domain.User{}, fmt.Errorf("find user by email: %w", err)
 	}
-	
+
 	return u, nil
 }
 
@@ -68,7 +68,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (domain.User, e
 
 func (r *UserRepository) Update(ctx context.Context, user domain.User) error {
 	query := `UPDATE users SET email = $1, password_hash = $2, role = $3, status = $4 WHERE id = $5`
-	
+
 	result, err := r.db.ExecContext(ctx, query, user.Email, user.PasswordHash, user.Role, user.Status, user.ID)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -91,7 +91,7 @@ func (r *UserRepository) Update(ctx context.Context, user domain.User) error {
 
 func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
 	query := `SELECT id, email, password_hash, role, status, created_at FROM users ORDER BY id`
-	
+
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
