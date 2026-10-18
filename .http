@@ -53,3 +53,21 @@ Content-Type: application/json
   "email": "lucas@test.fr",
   "code": "000000"
 }
+
+### 7. Connexion → 200 + token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "motdepasse123"
+}
+
+### 8. Mauvais mot de passe → 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "mauvais123"
+}

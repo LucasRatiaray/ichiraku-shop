@@ -13,5 +13,7 @@ func NewRouter(auth *AuthHandler) http.Handler {
 
 	mux.HandleFunc("POST /auth/confirm", auth.Confirm)
 
+	mux.HandleFunc("POST /auth/login", auth.Login)
+
 	return mux
 }

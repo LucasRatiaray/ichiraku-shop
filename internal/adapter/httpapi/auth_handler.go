@@ -39,6 +39,15 @@ type confirmRequest struct {
 	Code  string `json:"code"`
 }
 
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	Token     string    `json:"token"`
+}
+
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
 
@@ -92,4 +101,32 @@ func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	token, err := h.auth.Login(r.Context(), req.Email, req.Password)
+	switch {
+	case errors.Is(err, domain.ErrInvalidCredentials):
+		writeError(w, http.StatusUnauthorized, "invalid email or password")
+		return
+	case errors.Is(err, domain.ErrAccountNotConfirmed):
+		writeError(w, http.StatusForbidden, "account not confirmed")
+		return
+	case err != nil:
+		log.Printf("login: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, loginResponse{
+		Token: token,
+	})
 }
