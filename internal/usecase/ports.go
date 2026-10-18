@@ -24,3 +24,9 @@ type VerificationCodeRepository interface {
 type Mailer interface {
 	SendCode(ctx context.Context, email string, code string, purpose domain.CodePurpose) error
 }
+
+type SessionRepository interface {
+	Create(ctx context.Context, code *domain.Session) error
+	FindValid(ctx context.Context, tokenHash string) (domain.Session, error)
+	Delete(ctx context.Context, tokenHash string) error
+}
