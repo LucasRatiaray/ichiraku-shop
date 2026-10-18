@@ -9,7 +9,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/httpapi"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/postgres"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/usecase"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -38,15 +40,13 @@ func main() {
 
 	log.Println("Connected to the database successfully")
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	userRepo := postgres.NewUserRepository(db)
+	authService := usecase.NewAuthService(userRepo)
+	authHandler := httpapi.NewAuthHandler(authService)
 
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           mux,
+		Handler:           httpapi.NewRouter(authHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
