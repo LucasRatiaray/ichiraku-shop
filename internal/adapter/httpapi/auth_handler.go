@@ -45,7 +45,7 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	Token     string    `json:"token"`
+	Token string `json:"token"`
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {

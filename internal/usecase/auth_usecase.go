@@ -162,3 +162,27 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 
 	return token, nil
 }
+
+func (s *AuthService) Authenticate(ctx context.Context, token string) (domain.User, error) {
+	sess, err := s.sessions.FindValid(ctx, hashToken(token))
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.User{}, domain.ErrUnauthorized
+	}
+	if err != nil {
+		return domain.User{}, fmt.Errorf("authenticate: %w", err)
+	}
+
+	u, err := s.users.FindByID(ctx, sess.UserID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.User{}, domain.ErrUnauthorized
+	}
+	if err != nil {
+		return domain.User{}, fmt.Errorf("authenticate: %w", err)
+	}
+
+	if u.Status != domain.StatusActive {
+		return domain.User{}, domain.ErrUnauthorized
+	}
+
+	return u, nil
+}
