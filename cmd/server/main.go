@@ -44,7 +44,9 @@ func main() {
 	userRepo := postgres.NewUserRepository(db)
 	codeRepo := postgres.NewVerificationCodeRepository(db)
 	mail := mailer.NewLogMailer()
-	authService := usecase.NewAuthService(userRepo, codeRepo, mail)
+	sessionRepo := postgres.NewSessionRepository(db)
+
+	authService := usecase.NewAuthService(userRepo, codeRepo, mail, sessionRepo)
 	authHandler := httpapi.NewAuthHandler(authService)
 
 	srv := &http.Server{

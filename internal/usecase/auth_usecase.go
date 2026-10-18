@@ -14,16 +14,18 @@ import (
 )
 
 type AuthService struct {
-	users  UserRepository
-	codes  VerificationCodeRepository
-	mailer Mailer
+	users    UserRepository
+	codes    VerificationCodeRepository
+	mailer   Mailer
+	sessions SessionRepository
 }
 
-func NewAuthService(users UserRepository, codes VerificationCodeRepository, mailer Mailer) *AuthService {
+func NewAuthService(users UserRepository, codes VerificationCodeRepository, mailer Mailer, sessions SessionRepository) *AuthService {
 	return &AuthService{
-		users:  users,
-		codes:  codes,
-		mailer: mailer,
+		users:    users,
+		codes:    codes,
+		mailer:   mailer,
+		sessions: sessions,
 	}
 }
 
@@ -114,4 +116,49 @@ func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 		return fmt.Errorf("confirm: %w", err)
 	}
 	return nil
+}
+
+func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	u, err := s.users.FindByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return "", domain.ErrInvalidCredentials
+	}
+	if err != nil {
+		return "", fmt.Errorf("login: %w", err)
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		return "", domain.ErrInvalidCredentials
+	}
+	if err != nil {
+		return "", fmt.Errorf("login: %w", err)
+	}
+
+	if u.Status == domain.StatusPending {
+		return "", domain.ErrAccountNotConfirmed
+	}
+
+	if u.Status == domain.StatusDisabled {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	token, err := generateToken()
+	if err != nil {
+		return "", fmt.Errorf("login: %w", err)
+	}
+
+	sess := domain.Session{
+		UserID:    u.ID,
+		TokenHash: hashToken(token),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+
+	if err := s.sessions.Create(ctx, &sess); err != nil {
+		return "", fmt.Errorf("login: %w", err)
+	}
+
+	return token, nil
 }
