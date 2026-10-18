@@ -14,3 +14,9 @@ type UserRepository interface {
 	Update(ctx context.Context, user domain.User) error
 	List(ctx context.Context) ([]domain.User, error)
 }
+
+type VerificationCodeRepository interface {
+	Create(ctx context.Context, code *domain.VerificationCode) error
+	FindValid(ctx context.Context, userID int64, code string, purpose domain.CodePurpose) (domain.VerificationCode, error)
+	MarkUsed(ctx context.Context, id int64) error
+}

@@ -10,9 +10,9 @@ const (
 )
 
 type VerificationCode struct {
-	ID 		  int64
+	ID        int64
 	UserID    int64
-	Code 	  string
+	Code      string
 	Purpose   CodePurpose
 	ExpiresAt time.Time
 	UsedAt    *time.Time
