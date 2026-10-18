@@ -34,4 +34,22 @@ Content-Type: application/json
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
-{ "email": "cassé@test.fr",
+{ "email": "cassé@test.fr", }
+
+### 5. Confirmation → 204
+POST {{baseUrl}}/auth/confirm
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "code": "665538"
+}
+
+### 6. Code faux → 400
+POST {{baseUrl}}/auth/confirm
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "code": "000000"
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/httpapi"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/mailer"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/postgres"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/usecase"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -41,7 +42,9 @@ func main() {
 	log.Println("Connected to the database successfully")
 
 	userRepo := postgres.NewUserRepository(db)
-	authService := usecase.NewAuthService(userRepo)
+	codeRepo := postgres.NewVerificationCodeRepository(db)
+	mail := mailer.NewLogMailer()
+	authService := usecase.NewAuthService(userRepo, codeRepo, mail)
 	authHandler := httpapi.NewAuthHandler(authService)
 
 	srv := &http.Server{

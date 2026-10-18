@@ -20,3 +20,7 @@ type VerificationCodeRepository interface {
 	FindValid(ctx context.Context, userID int64, code string, purpose domain.CodePurpose) (domain.VerificationCode, error)
 	MarkUsed(ctx context.Context, id int64) error
 }
+
+type Mailer interface {
+	SendCode(ctx context.Context, email string, code string, purpose domain.CodePurpose) error
+}
