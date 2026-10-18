@@ -36,7 +36,7 @@ type userResponse struct {
 
 type confirmRequest struct {
 	Email string `json:"email"`
-	Code	string `json:"code"`
+	Code  string `json:"code"`
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 		return
 	case err != nil:
 		log.Printf("confirm: %v", err)
-		writeError(w,http.StatusInternalServerError, "internal error")
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
