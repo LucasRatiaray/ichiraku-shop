@@ -1,10 +1,13 @@
 package client
 
 import (
+	"strconv"
+
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
 type screen int
@@ -19,6 +22,9 @@ const (
 	screenHome
 	screenSearch
 	screenResults
+	screenAddToBasket
+	screenBasket
+	screenEditBasket
 )
 
 type Model struct {
@@ -33,6 +39,7 @@ type Model struct {
 	quitting bool
 	spinner  spinner.Model
 	products []apiclient.Product
+	basket   apiclient.Basket
 }
 
 func New(api *apiclient.Client) Model {
@@ -53,6 +60,12 @@ func (m Model) startLoading(cmd tea.Cmd) (Model, tea.Cmd) {
 	return m, tea.Batch(cmd, m.spinner.Tick)
 }
 
+func (m Model) goHome() (Model, tea.Cmd) {
+	m.screen = screenHome
+	m.form = newHomeForm()
+	return m, m.form.Init()
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
@@ -69,21 +82,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.screen == screenSearch && msg.String() == "esc" {
 			m.err = ""
-			m.screen = screenHome
-			m.form = newHomeForm()
-			return m, m.form.Init()
+			return m.goHome()
+		}
+		if m.screen == screenAddToBasket && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenResults
+			return m, nil
+		}
+		if m.screen == screenEditBasket && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenBasket
+			return m, nil
 		}
 		if m.screen == screenResults {
 			switch msg.String() {
+			case "a":
+				if len(m.products) == 0 {
+					return m, nil
+				}
+				m.screen = screenAddToBasket
+				m.form = newAddToBasketForm(m.products)
+				return m, m.form.Init()
 			case "n":
 				m.screen = screenSearch
 				m.form = newSearchForm()
 				return m, m.form.Init()
 			case "esc", "q":
 				m.err = ""
-				m.screen = screenHome
-				m.form = newHomeForm()
+				return m.goHome()
+			}
+			return m, nil
+		}
+		if m.screen == screenBasket {
+			switch msg.String() {
+			case "m":
+				if len(m.basket.Items) == 0 {
+					return m, nil
+				}
+				m.info = ""
+				m.screen = screenEditBasket
+				m.form = newEditBasketForm(m.basket.Items)
 				return m, m.form.Init()
+			case "esc", "q":
+				m.err = ""
+				m.info = ""
+				return m.goHome()
 			}
 			return m, nil
 		}
@@ -98,9 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.token = msg.token
 		m.err = ""
 		m.info = ""
-		m.screen = screenHome
-		m.form = newHomeForm()
-		return m, m.form.Init()
+		return m.goHome()
 
 	case registerResultMsg:
 		m.loading = false
@@ -176,6 +217,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.products = msg.products
 		m.screen = screenResults
 		return m, nil
+
+	case basketResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.info = ""
+			switch m.screen {
+			case screenAddToBasket:
+				m.form = newAddToBasketForm(m.products)
+				return m, m.form.Init()
+			case screenEditBasket:
+				m.form = newEditBasketForm(m.basket.Items)
+				return m, m.form.Init()
+			}
+			return m.goHome()
+		}
+		m.err = ""
+		m.basket = msg.basket
+		m.screen = screenBasket
+		return m, nil
 	}
 
 	if m.loading {
@@ -233,29 +294,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = ""
 		m.info = ""
 		switch m.form.GetString("choice") {
-		case "logout":
-			return m.startLoading(logoutCmd(m.api, m.token))
-		case "quit":
-			m.quitting = true
-			return m.startLoading(logoutCmd(m.api, m.token))
 		case "catalog":
 			m.screen = screenSearch
 			m.form = newSearchForm()
 			return m, m.form.Init()
 		case "cart":
-			m.info = "Bientôt disponible."
-			m.form = newHomeForm()
-			return m, m.form.Init()
+			return m.startLoading(getBasketCmd(m.api, m.token))
+		case "logout":
+			return m.startLoading(logoutCmd(m.api, m.token))
+		case "quit":
+			m.quitting = true
+			return m.startLoading(logoutCmd(m.api, m.token))
 		}
+
 	case screenSearch:
 		return m.startLoading(searchCmd(m.api, filterFromSearchForm(m.form)))
+
+	case screenAddToBasket:
+		qty, _ := strconv.Atoi(m.form.GetString("quantity"))
+		m.info = "Ajouté au panier."
+		return m.startLoading(addToBasketCmd(m.api, m.token, m.form.GetString("product"), qty))
+
+	case screenEditBasket:
+		qty, _ := strconv.Atoi(m.form.GetString("quantity"))
+		m.info = "Panier mis à jour."
+		return m.startLoading(setBasketQuantityCmd(m.api, m.token, m.form.GetString("product"), qty))
 	}
 
 	return m, cmd
 }
 
 func (m Model) View() tea.View {
-	s := titleStyle.Render("🍜 Ichiraku Shop") + "\n\n"
+	s := ui.TitleStyle.Render("🍜 Ichiraku Shop") + "\n\n"
 
 	if m.loading {
 		s += m.spinner.View() + " Chargement…\n"
@@ -263,23 +333,27 @@ func (m Model) View() tea.View {
 	}
 
 	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
-	if m.screen == screenResults {
+	switch m.screen {
+	case screenResults:
 		s += renderProducts(m.products)
-		help = "n nouvelle recherche • esc retour • ctrl+c quitter"
-	} else {
+		help = "a ajouter au panier • n nouvelle recherche • esc retour • ctrl+c quitter"
+	case screenBasket:
+		s += renderBasket(m.basket)
+		help = "m modifier une quantité • esc retour • ctrl+c quitter"
+	default:
 		s += m.form.View()
-		if m.screen == screenSearch {
+		if m.screen == screenSearch || m.screen == screenAddToBasket || m.screen == screenEditBasket {
 			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
 		}
 	}
 
 	if m.err != "" {
-		s += "\n" + errStyle.Render("✗ "+m.err) + "\n"
+		s += "\n" + ui.ErrStyle.Render("✗ "+m.err) + "\n"
 	}
 	if m.info != "" {
-		s += "\n" + infoStyle.Render("✓ "+m.info) + "\n"
+		s += "\n" + ui.InfoStyle.Render("✓ "+m.info) + "\n"
 	}
 
-	s += "\n" + helpStyle.Render(help)
+	s += "\n" + ui.HelpStyle.Render(help)
 	return tea.NewView(s)
 }

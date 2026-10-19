@@ -209,3 +209,51 @@ func (c *Client) CreateProduct(ctx context.Context, token, name, description, ca
 	}
 	return p, nil
 }
+
+type BasketItem struct {
+	ProductID    string `json:"product_id"`
+	Name         string `json:"name"`
+	UnitPriceTTC int64  `json:"unit_price_ttc"`
+	Quantity     int    `json:"quantity"`
+	TotalTTC     int64  `json:"total_ttc"`
+}
+
+type Basket struct {
+	ID           string       `json:"id"`
+	Items        []BasketItem `json:"items"`
+	ShippingCost int64        `json:"shipping_cost"`
+	TotalTTC     int64        `json:"total_ttc"`
+}
+
+type addItemRequest struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+type setQuantityRequest struct {
+	Quantity int `json:"quantity"`
+}
+
+func (c *Client) GetBasket(ctx context.Context, token string) (Basket, error) {
+	var b Basket
+	err := c.do(ctx, http.MethodGet, "/basket", token, nil, &b)
+	return b, err
+}
+
+func (c *Client) AddToBasket(ctx context.Context, token, productID string, quantity int) (Basket, error) {
+	var b Basket
+	err := c.do(ctx, http.MethodPost, "/basket/items", token, addItemRequest{ProductID: productID, Quantity: quantity}, &b)
+	return b, err
+}
+
+func (c *Client) SetBasketQuantity(ctx context.Context, token, productID string, quantity int) (Basket, error) {
+	var b Basket
+	err := c.do(ctx, http.MethodPut, "/basket/items/"+url.PathEscape(productID), token, setQuantityRequest{Quantity: quantity}, &b)
+	return b, err
+}
+
+func (c *Client) RemoveFromBasket(ctx context.Context, token, productID string) (Basket, error) {
+	var b Basket
+	err := c.do(ctx, http.MethodDelete, "/basket/items/"+url.PathEscape(productID), token, nil, &b)
+	return b, err
+}

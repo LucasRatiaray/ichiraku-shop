@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
 func renderProducts(products []apiclient.Product) string {
@@ -23,4 +24,23 @@ func renderProducts(products []apiclient.Product) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func renderBasket(b apiclient.Basket) string {
+	var s strings.Builder
+	fmt.Fprintf(&s, "Panier %s\n\n", ui.HelpStyle.Render(b.ID))
+
+	if len(b.Items) == 0 {
+		s.WriteString(ui.InfoStyle.Render("Ton panier est vide."))
+		s.WriteString("\n")
+		return s.String()
+	}
+
+	for _, it := range b.Items {
+		fmt.Fprintf(&s, "%s  ×%d  %s\n", ui.NameStyle.Render(it.Name), it.Quantity, ui.FormatEuros(it.TotalTTC))
+		fmt.Fprintf(&s, "    %s · %s TTC l'unité\n", ui.HelpStyle.Render(it.ProductID), ui.FormatEuros(it.UnitPriceTTC))
+	}
+	fmt.Fprintf(&s, "\nLivraison : gratuite\n")
+	fmt.Fprintf(&s, "Total TTC : %s\n", ui.NameStyle.Render(ui.FormatEuros(b.TotalTTC)))
+	return s.String()
 }

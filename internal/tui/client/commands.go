@@ -86,3 +86,29 @@ func searchCmd(api *apiclient.Client, f domain.ProductFilter) tea.Cmd {
 		return searchResultMsg{products: products, err: err}
 	}
 }
+
+type basketResultMsg struct {
+	basket apiclient.Basket
+	err    error
+}
+
+func getBasketCmd(api *apiclient.Client, token string) tea.Cmd {
+	return func() tea.Msg {
+		b, err := api.GetBasket(context.Background(), token)
+		return basketResultMsg{basket: b, err: err}
+	}
+}
+
+func addToBasketCmd(api *apiclient.Client, token, productID string, quantity int) tea.Cmd {
+	return func() tea.Msg {
+		b, err := api.AddToBasket(context.Background(), token, productID, quantity)
+		return basketResultMsg{basket: b, err: err}
+	}
+}
+
+func setBasketQuantityCmd(api *apiclient.Client, token, productID string, quantity int) tea.Cmd {
+	return func() tea.Msg {
+		b, err := api.SetBasketQuantity(context.Background(), token, productID, quantity)
+		return basketResultMsg{basket: b, err: err}
+	}
+}

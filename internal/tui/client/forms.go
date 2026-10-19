@@ -1,8 +1,13 @@
 package client
 
 import (
+	"fmt"
+	"strconv"
+
 	"charm.land/huh/v2"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
 func newMenuForm() *huh.Form {
@@ -106,4 +111,40 @@ func filterFromSearchForm(form *huh.Form) domain.ProductFilter {
 		MinPriceTTC: minTTC,
 		MaxPriceTTC: maxTTC,
 	}
+}
+
+func validateQuantity(min int) func(string) error {
+	return func(s string) error {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < min || n > 99 {
+			return fmt.Errorf("quantité entre %d et 99", min)
+		}
+		return nil
+	}
+}
+
+func newAddToBasketForm(products []apiclient.Product) *huh.Form {
+	opts := make([]huh.Option[string], 0, len(products))
+	for _, p := range products {
+		opts = append(opts, huh.NewOption(fmt.Sprintf("%s — %s TTC", p.Name, ui.FormatEuros(p.PriceTTC)), p.ID))
+	}
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Key("product").Title("Produit").Options(opts...),
+			huh.NewInput().Key("quantity").Title("Quantité").Placeholder("1").Validate(validateQuantity(1)),
+		),
+	)
+}
+
+func newEditBasketForm(items []apiclient.BasketItem) *huh.Form {
+	opts := make([]huh.Option[string], 0, len(items))
+	for _, it := range items {
+		opts = append(opts, huh.NewOption(fmt.Sprintf("%s (%d)", it.Name, it.Quantity), it.ProductID))
+	}
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Key("product").Title("Ligne à modifier").Options(opts...),
+			huh.NewInput().Key("quantity").Title("Nouvelle quantité (0 = supprimer)").Validate(validateQuantity(0)),
+		),
+	)
 }
