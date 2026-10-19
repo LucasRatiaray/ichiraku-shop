@@ -36,3 +36,17 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS vat_rate BIGINT NOT NULL DEFAULT 2000;
+
+CREATE TABLE IF NOT EXISTS baskets (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    business_id TEXT NOT NULL UNIQUE,
+    user_id     BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS basket_items (
+    basket_id  BIGINT NOT NULL REFERENCES baskets(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity   INT NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (basket_id, product_id)
+);
