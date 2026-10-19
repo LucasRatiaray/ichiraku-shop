@@ -27,6 +27,7 @@ const (
 	screenBasket
 	screenEditBasket
 	screenPayment
+	screenOrders
 )
 
 type Model struct {
@@ -42,6 +43,7 @@ type Model struct {
 	spinner  spinner.Model
 	products []apiclient.Product
 	basket   apiclient.Basket
+	orders   []apiclient.Order
 }
 
 func New(api *apiclient.Client) Model {
@@ -142,6 +144,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if m.screen == screenOrders {
+			switch msg.String() {
+			case "esc", "q":
+				m.err = ""
+				return m.goHome()
+			}
+			return m, nil
+		}
 
 	case loginResultMsg:
 		m.loading = false
@@ -214,6 +224,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.token = ""
 		m.basket = apiclient.Basket{}
 		m.products = nil
+		m.orders = nil
 		m.err = ""
 		m.info = "Tu es déconnecté."
 		m.screen = screenMenu
@@ -263,6 +274,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.basket = apiclient.Basket{}
 		m.info = fmt.Sprintf("Commande %s payée — %s TTC", msg.order.ID, ui.FormatEuros(msg.order.TotalTTC))
 		return m.goHome()
+
+	case ordersResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			return m.goHome()
+		}
+		m.err = ""
+		m.orders = msg.orders
+		m.screen = screenOrders
+		return m, nil
 	}
 
 	if m.loading {
@@ -326,6 +348,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.form.Init()
 		case "cart":
 			return m.startLoading(getBasketCmd(m.api, m.token))
+		case "orders":
+			return m.startLoading(listOrdersCmd(m.api, m.token))
 		case "logout":
 			return m.startLoading(logoutCmd(m.api, m.token))
 		case "quit":
@@ -370,6 +394,9 @@ func (m Model) View() tea.View {
 	case screenBasket:
 		s += renderBasket(m.basket)
 		help = "p payer • m modifier une quantité • esc retour • ctrl+c quitter"
+	case screenOrders:
+		s += renderOrders(m.orders)
+		help = "esc retour • ctrl+c quitter"
 	default:
 		s += m.form.View()
 		switch m.screen {

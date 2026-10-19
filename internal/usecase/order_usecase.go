@@ -59,3 +59,11 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, cardNumber, expiry
 	}
 	return domain.Order{}, fmt.Errorf("generate order id: %w", domain.ErrConflict)
 }
+
+func (s *OrderService) ListMine(ctx context.Context, userID int64) ([]domain.Order, error) {
+	orders, err := s.orders.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list orders: %w", err)
+	}
+	return orders, nil
+}

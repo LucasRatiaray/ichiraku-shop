@@ -88,3 +88,20 @@ func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
 }
+
+func (h *OrderHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+
+	orders, err := h.orders.ListMine(r.Context(), user.ID)
+	if err != nil {
+		log.Printf("list orders: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]orderResponse, 0, len(orders))
+	for _, o := range orders {
+		resp = append(resp, toOrderResponse(o))
+	}
+	writeJSON(w, http.StatusOK, resp)
+}

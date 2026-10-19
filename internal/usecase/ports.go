@@ -46,4 +46,5 @@ type BasketRepository interface {
 
 type OrderRepository interface {
 	CreatePaid(ctx context.Context, o *domain.Order, p *domain.Payment, basketID int64) error
+	ListByUser(ctx context.Context, userID int64) ([]domain.Order, error)
 }

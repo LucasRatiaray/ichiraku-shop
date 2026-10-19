@@ -124,3 +124,15 @@ func checkoutCmd(api *apiclient.Client, token, cardNumber, expiry, cvc string) t
 		return orderResultMsg{order: o, err: err}
 	}
 }
+
+type ordersResultMsg struct {
+	orders []apiclient.Order
+	err    error
+}
+
+func listOrdersCmd(api *apiclient.Client, token string) tea.Cmd {
+	return func() tea.Msg {
+		orders, err := api.ListOrders(context.Background(), token)
+		return ordersResultMsg{orders: orders, err: err}
+	}
+}

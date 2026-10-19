@@ -76,3 +76,56 @@ func insertOrder(ctx context.Context, tx *sql.Tx, o *domain.Order) error {
 	}
 	return nil
 }
+
+func (r *OrderRepository) ListByUser(ctx context.Context, userID int64) ([]domain.Order, error) {
+	return r.list(ctx, "WHERE o.user_id = $1", userID)
+}
+
+func (r *OrderRepository) list(ctx context.Context, where string, args ...any) ([]domain.Order, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT o.id, o.business_id, o.user_id, o.status, o.cancel_reason, o.total_ttc, o.created_at
+		FROM orders o `+where+`
+		ORDER BY o.created_at DESC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list orders: %w", err)
+	}
+	defer rows.Close()
+
+	orders := []domain.Order{}
+	index := make(map[int64]int)
+	for rows.Next() {
+		var o domain.Order
+		if err := rows.Scan(&o.ID, &o.BusinessID, &o.UserID, &o.Status, &o.CancelReason, &o.TotalTTC, &o.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan order: %w", err)
+		}
+		index[o.ID] = len(orders)
+		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate orders: %w", err)
+	}
+
+	itemRows, err := r.db.QueryContext(ctx, `
+		SELECT oi.order_id, oi.product_id, oi.product_business_id, oi.name, oi.unit_price_ttc, oi.quantity
+		FROM order_items oi
+		JOIN orders o ON o.id = oi.order_id `+where+`
+		ORDER BY oi.name`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list order items: %w", err)
+	}
+	defer itemRows.Close()
+
+	for itemRows.Next() {
+		var orderID int64
+		var it domain.OrderItem
+		if err := itemRows.Scan(&orderID, &it.ProductID, &it.ProductBusinessID, &it.Name, &it.UnitPriceTTC, &it.Quantity); err != nil {
+			return nil, fmt.Errorf("scan order item: %w", err)
+		}
+		i := index[orderID]
+		orders[i].Items = append(orders[i].Items, it)
+	}
+	if err := itemRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate order items: %w", err)
+	}
+	return orders, nil
+}

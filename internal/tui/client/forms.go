@@ -30,15 +30,13 @@ func newMenuForm() *huh.Form {
 func newHomeForm() *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
-			huh.NewSelect[string]().
-				Key("choice").
-				Title("Bienvenue").
-				Options(
-					huh.NewOption("Catalogue", "catalog"),
-					huh.NewOption("Mon panier", "cart"),
-					huh.NewOption("Se déconnecter", "logout"),
-					huh.NewOption("Quitter", "quit"),
-				),
+			huh.NewSelect[string]().Key("choice").Title("Que veux-tu faire ?").Options(
+				huh.NewOption("Catalogue", "catalog"),
+				huh.NewOption("Panier", "cart"),
+				huh.NewOption("Mes commandes", "orders"),
+				huh.NewOption("Se déconnecter", "logout"),
+				huh.NewOption("Quitter", "quit"),
+			),
 		),
 	)
 }

@@ -284,3 +284,14 @@ Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08d
 Content-Type: application/json
 
 {"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "12"}
+
+### 44. My orders
+GET http://localhost:8080/orders
+Authorization: Bearer ac2b36276f4953f4ab9f760f55ea47a755e75a16b1c25daacc498502f05b0f41
+
+### 45. Other user → only their orders (or [])
+GET http://localhost:8080/orders
+Authorization: Bearer ac2b36276f4953f4ab9f760f55ea47a755e75a16b1c25daacc498502f05b0f41
+
+### 46. No token → 401
+GET http://localhost:8080/orders

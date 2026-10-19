@@ -33,6 +33,7 @@ func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandl
 	mux.HandleFunc("DELETE /basket/items/{productID}", auth.RequireAuth(baskets.RemoveItem))
 
 	mux.HandleFunc("POST /orders", auth.RequireAuth(orders.Checkout))
+	mux.HandleFunc("GET /orders", auth.RequireAuth(orders.ListMine))
 
 	return mux
 }

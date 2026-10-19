@@ -286,3 +286,9 @@ func (c *Client) Checkout(ctx context.Context, token, cardNumber, expiry, cvc st
 	err := c.do(ctx, http.MethodPost, "/orders", token, checkoutRequest{CardNumber: cardNumber, Expiry: expiry, CVC: cvc}, &o)
 	return o, err
 }
+
+func (c *Client) ListOrders(ctx context.Context, token string) ([]Order, error) {
+	var orders []Order
+	err := c.do(ctx, http.MethodGet, "/orders", token, nil, &orders)
+	return orders, err
+}
