@@ -157,3 +157,41 @@ func (h *OrderHandler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
 }
+
+type adminOrderLine struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+type adminCreateOrderRequest struct {
+	UserEmail string           `json:"user_email"`
+	Items     []adminOrderLine `json:"items"`
+}
+
+func (h *OrderHandler) CreateForUser(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req adminCreateOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	lines := make([]usecase.OrderLine, 0, len(req.Items))
+	for _, it := range req.Items {
+		lines = append(lines, usecase.OrderLine{ProductID: it.ProductID, Quantity: it.Quantity})
+	}
+
+	o, err := h.orders.CreateForUser(r.Context(), req.UserEmail, lines)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusCreated, toOrderResponse(o))
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, "at least one item, quantities between 1 and 99")
+	case errors.Is(err, domain.ErrNotFound):
+		writeError(w, http.StatusNotFound, "user or product not found")
+	default:
+		log.Printf("admin create order: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+	}
+}

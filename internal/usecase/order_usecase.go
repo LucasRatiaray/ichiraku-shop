@@ -12,12 +12,19 @@ import (
 )
 
 type OrderService struct {
-	orders  OrderRepository
-	baskets BasketRepository
+	orders   OrderRepository
+	baskets  BasketRepository
+	users    UserRepository
+	products ProductRepository
 }
 
-func NewOrderService(orders OrderRepository, baskets BasketRepository) *OrderService {
-	return &OrderService{orders: orders, baskets: baskets}
+func NewOrderService(orders OrderRepository, baskets BasketRepository, users UserRepository, products ProductRepository) *OrderService {
+	return &OrderService{orders: orders, baskets: baskets, users: users, products: products}
+}
+
+type OrderLine struct {
+	ProductID string
+	Quantity  int
 }
 
 func (s *OrderService) Pay(ctx context.Context, userID int64, cardNumber, expiry, cvc string) (domain.Order, error) {
@@ -92,4 +99,64 @@ func (s *OrderService) ChangeStatus(ctx context.Context, orderID string, to doma
 		return domain.Order{}, err
 	}
 	return o, nil
+}
+
+func (s *OrderService) CreateForUser(ctx context.Context, email string, lines []OrderLine) (domain.Order, error) {
+	if len(lines) == 0 {
+		return domain.Order{}, domain.ErrInvalidInput
+	}
+
+	user, err := s.users.FindByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	quantities := make(map[string]int)
+	var order []string
+	for _, l := range lines {
+		id := strings.ToUpper(strings.TrimSpace(l.ProductID))
+		if _, seen := quantities[id]; !seen {
+			order = append(order, id)
+		}
+		quantities[id] += l.Quantity
+	}
+
+	o := domain.Order{UserID: user.ID, UserEmail: user.Email, Status: domain.OrderPending}
+	for _, id := range order {
+		qty := quantities[id]
+		if qty < 1 || qty > maxQuantity {
+			return domain.Order{}, domain.ErrInvalidInput
+		}
+		p, err := s.products.FindByBusinessID(ctx, id)
+		if err != nil {
+			return domain.Order{}, err
+		}
+		item := domain.OrderItem{
+			ProductID:         p.ID,
+			ProductBusinessID: p.BusinessID,
+			Name:              p.Name,
+			UnitPriceTTC:      p.PriceTTC(),
+			Quantity:          qty,
+		}
+		o.Items = append(o.Items, item)
+		o.TotalTTC += item.TotalTTC()
+	}
+	o.TotalTTC += domain.ShippingCost
+
+	for attempt := 0; attempt < maxIDAttempts; attempt++ {
+		bid, err := domain.NewBusinessID(domain.PrefixOrder)
+		if err != nil {
+			return domain.Order{}, fmt.Errorf("generate order id: %w", err)
+		}
+		o.BusinessID = bid
+
+		err = s.orders.Create(ctx, &o)
+		if err == nil {
+			return o, nil
+		}
+		if !errors.Is(err, domain.ErrConflict) {
+			return domain.Order{}, fmt.Errorf("create order: %w", err)
+		}
+	}
+	return domain.Order{}, fmt.Errorf("generate order id: %w", domain.ErrConflict)
 }

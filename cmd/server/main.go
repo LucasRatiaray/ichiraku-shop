@@ -68,7 +68,7 @@ func main() {
 	basketHandler := httpapi.NewBasketHandler(basketService)
 
 	orderRepo := postgres.NewOrderRepository(db)
-	orderService := usecase.NewOrderService(orderRepo, basketRepo)
+	orderService := usecase.NewOrderService(orderRepo, basketRepo, userRepo, productRepo)
 	orderHandler := httpapi.NewOrderHandler(orderService)
 
 	srv := &http.Server{

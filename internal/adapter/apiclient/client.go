@@ -273,6 +273,7 @@ type Order struct {
 	TotalTTC     int64       `json:"total_ttc"`
 	Items        []OrderItem `json:"items"`
 	CreatedAt    time.Time   `json:"created_at"`
+	UserEmail 	 string 		 `json:"user_email"`
 }
 
 type checkoutRequest struct {
@@ -291,4 +292,38 @@ func (c *Client) ListOrders(ctx context.Context, token string) ([]Order, error) 
 	var orders []Order
 	err := c.do(ctx, http.MethodGet, "/orders", token, nil, &orders)
 	return orders, err
+}
+
+type changeStatusRequest struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+}
+
+type OrderLine struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+type adminCreateOrderRequest struct {
+	UserEmail string      `json:"user_email"`
+	Items     []OrderLine `json:"items"`
+}
+
+func (c *Client) ListAllOrders(ctx context.Context, token string) ([]Order, error) {
+	var orders []Order
+	err := c.do(ctx, http.MethodGet, "/admin/orders", token, nil, &orders)
+	return orders, err
+}
+
+func (c *Client) ChangeOrderStatus(ctx context.Context, token, orderID, status, reason string) (Order, error) {
+	var o Order
+	path := "/admin/orders/" + url.PathEscape(orderID) + "/status"
+	err := c.do(ctx, http.MethodPatch, path, token, changeStatusRequest{Status: status, Reason: reason}, &o)
+	return o, err
+}
+
+func (c *Client) CreateOrderForUser(ctx context.Context, token, email string, items []OrderLine) (Order, error) {
+	var o Order
+	err := c.do(ctx, http.MethodPost, "/admin/orders", token, adminCreateOrderRequest{UserEmail: email, Items: items}, &o)
+	return o, err
 }

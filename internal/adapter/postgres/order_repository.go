@@ -162,3 +162,19 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, id int64, from, to d
 	}
 	return nil
 }
+
+func (r *OrderRepository) Create(ctx context.Context, o *domain.Order) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := insertOrder(ctx, tx, o); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}

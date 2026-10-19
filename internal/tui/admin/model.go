@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strconv"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -16,6 +17,9 @@ const (
 	screenLogin screen = iota
 	screenHome
 	screenCreateProduct
+	screenOrders
+	screenChangeStatus
+	screenCreateOrder
 )
 
 type Model struct {
@@ -28,6 +32,8 @@ type Model struct {
 	info     string
 	quitting bool
 	spinner  spinner.Model
+	orders   []apiclient.Order
+	products []apiclient.Product
 }
 
 func New(api *apiclient.Client) Model {
@@ -68,9 +74,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.screen == screenCreateProduct && msg.String() == "esc" {
+		if (m.screen == screenCreateProduct || m.screen == screenCreateOrder) && msg.String() == "esc" {
 			m.err = ""
 			return m.goHome()
+		}
+		if m.screen == screenChangeStatus && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenOrders
+			return m, nil
+		}
+		if m.screen == screenOrders {
+			switch msg.String() {
+			case "s":
+				if len(m.orders) == 0 {
+					return m, nil
+				}
+				m.err = ""
+				m.info = ""
+				m.screen = screenChangeStatus
+				m.form = newChangeStatusForm(m.orders)
+				return m, m.form.Init()
+			case "r":
+				m.info = ""
+				return m.startLoading(listAllOrdersCmd(m.api, m.token))
+			case "esc", "q":
+				m.err = ""
+				m.info = ""
+				return m.goHome()
+			}
+			return m, nil
 		}
 
 	case loginResultMsg:
@@ -90,6 +122,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = false
 		m.token = ""
+		m.orders = nil
+		m.products = nil
 		m.info = "Tu es déconnecté."
 		m.screen = screenLogin
 		m.form = newLoginForm()
@@ -104,6 +138,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = ""
 		m.info = fmt.Sprintf("Produit %s créé (%s TTC)", msg.product.ID, ui.FormatEuros(msg.product.PriceTTC))
+		return m.goHome()
+
+	case ordersResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			return m.goHome()
+		}
+		m.err = ""
+		m.orders = msg.orders
+		m.screen = screenOrders
+		return m, nil
+
+	case statusChangedMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newChangeStatusForm(m.orders)
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.info = fmt.Sprintf("Commande %s : %s", msg.order.ID, ui.OrderStatusLabel(msg.order.Status))
+		return m.startLoading(listAllOrdersCmd(m.api, m.token))
+
+	case productsResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			return m.goHome()
+		}
+		if len(msg.products) == 0 {
+			m.err = "Aucun produit : crée d'abord un produit."
+			return m.goHome()
+		}
+		m.err = ""
+		m.products = msg.products
+		m.screen = screenCreateOrder
+		m.form = newCreateOrderForm(m.products)
+		return m, m.form.Init()
+
+	case orderCreatedMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newCreateOrderForm(m.products)
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.info = fmt.Sprintf("Commande %s créée pour %s (en attente)", msg.order.ID, msg.order.UserEmail)
 		return m.goHome()
 	}
 
@@ -132,6 +215,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenCreateProduct
 			m.form = newCreateProductForm()
 			return m, m.form.Init()
+		case "orders":
+			return m.startLoading(listAllOrdersCmd(m.api, m.token))
+		case "create_order":
+			return m.startLoading(loadProductsCmd(m.api))
 		case "logout":
 			return m.startLoading(logoutCmd(m.api, m.token))
 		case "quit":
@@ -143,6 +230,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		price, _ := ui.ParseEuros(m.form.GetString("price"))
 		return m.startLoading(createProductCmd(m.api, m.token,
 			m.form.GetString("name"), m.form.GetString("description"), m.form.GetString("category"), price))
+
+	case screenChangeStatus:
+		return m.startLoading(changeStatusCmd(m.api, m.token,
+			m.form.GetString("order"), m.form.GetString("status"), m.form.GetString("reason")))
+
+	case screenCreateOrder:
+		ids, _ := m.form.Get("products").([]string)
+		qty, _ := strconv.Atoi(m.form.GetString("quantity"))
+		return m.startLoading(createOrderCmd(m.api, m.token, m.form.GetString("email"), ids, qty))
 	}
 
 	return m, cmd
@@ -156,7 +252,21 @@ func (m Model) View() tea.View {
 		return tea.NewView(s)
 	}
 
-	s += m.form.View()
+	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
+	switch m.screen {
+	case screenOrders:
+		s += renderOrders(m.orders)
+		help = "s changer un statut • r rafraîchir • esc retour • ctrl+c quitter"
+	default:
+		s += m.form.View()
+		switch m.screen {
+		case screenCreateProduct, screenChangeStatus:
+			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
+		case screenCreateOrder:
+			help = "↑/↓ naviguer • espace cocher • entrée valider • esc retour • ctrl+c quitter"
+		}
+	}
+
 	if m.err != "" {
 		s += "\n" + ui.ErrStyle.Render("✗ "+m.err) + "\n"
 	}
@@ -164,10 +274,6 @@ func (m Model) View() tea.View {
 		s += "\n" + ui.InfoStyle.Render("✓ "+m.info) + "\n"
 	}
 
-	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
-	if m.screen == screenCreateProduct {
-		help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
-	}
 	s += "\n" + ui.HelpStyle.Render(help)
 	return tea.NewView(s)
 }

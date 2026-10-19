@@ -359,3 +359,31 @@ Authorization: Bearer <token admin>
 Content-Type: application/json
 
 {"status": "shipping"}
+
+### 57. Admin creates order for a client → 201, status pending
+POST http://localhost:8080/admin/orders
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"user_email": "client@test.fr", "items": [{"product_id": "PDT-XXXXXX", "quantity": 2}, {"product_id": "PDT-XXXXXX", "quantity": 1}]}
+
+### 58. Unknown user → 404
+POST http://localhost:8080/admin/orders
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"user_email": "nobody@test.fr", "items": [{"product_id": "PDT-XXXXXX", "quantity": 1}]}
+
+### 59. No items → 400
+POST http://localhost:8080/admin/orders
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"user_email": "client@test.fr", "items": []}
+
+### 60. pending → paid → 200
+PATCH http://localhost:8080/admin/orders/CMD-NEW/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "paid"}

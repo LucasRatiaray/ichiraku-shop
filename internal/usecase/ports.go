@@ -50,4 +50,5 @@ type OrderRepository interface {
 	ListAll(ctx context.Context) ([]domain.Order, error)
 	FindByBusinessID(ctx context.Context, businessID string) (domain.Order, error)
 	UpdateStatus(ctx context.Context, id int64, from, to domain.OrderStatus, cancelReason string) error
+	Create(ctx context.Context, o *domain.Order) error
 }
