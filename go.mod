@@ -4,6 +4,8 @@ go 1.27.0
 
 require (
 	charm.land/bubbletea/v2 v2.1.0
+	charm.land/ssh v0.4.3
+	charm.land/wish/v2 v2.0.5
 	github.com/jackc/pgx/v5 v5.11.0
 	golang.org/x/crypto v0.58.0
 )
@@ -11,8 +13,6 @@ require (
 require (
 	charm.land/lipgloss/v2 v2.0.6 // indirect
 	charm.land/log/v2 v2.0.1 // indirect
-	charm.land/ssh v0.4.3 // indirect
-	charm.land/wish/v2 v2.0.5 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/keygen v0.5.4 // indirect

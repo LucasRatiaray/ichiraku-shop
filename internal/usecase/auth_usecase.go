@@ -265,7 +265,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPasswor
 	if err := s.users.Update(ctx, user); err != nil {
 		return fmt.Errorf("reset password: %w", err)
 	}
-	
+
 	return nil
 }
 
