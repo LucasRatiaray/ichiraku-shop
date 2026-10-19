@@ -82,3 +82,38 @@ func (c *Client) do(ctx context.Context, method, path, token string, body, out a
 
 	return nil
 }
+
+func (c *Client) Register(ctx context.Context, email, password string) error {
+	body := map[string]string{
+		"email":    email,
+		"password": password,
+	}
+	return c.do(ctx, http.MethodPost, "/auth/register", "", body, nil)
+}
+
+func (c *Client) Confirm(ctx context.Context, email, code string) error {
+	body := map[string]string{
+		"email": email,
+		"code":  code,
+	}
+	return c.do(ctx, http.MethodPost, "/auth/confirm", "", body, nil)
+}
+
+func (c *Client) Login(ctx context.Context, email, password string) (string, error) {
+	body := map[string]string{
+		"email":    email,
+		"password": password,
+	}
+	var res struct {
+		Token string `json:"token"`
+	}
+
+	if err := c.do(ctx, http.MethodPost, "/auth/login", "", body, &res); err != nil {
+		return "", err
+	}
+	return res.Token, nil
+}
+
+func (c *Client) Logout(ctx context.Context, token string) error {
+	return c.do(ctx, http.MethodPost, "/auth/logout", token, nil, nil)
+}
