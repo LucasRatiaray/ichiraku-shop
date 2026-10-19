@@ -11,7 +11,7 @@ import (
 //go:embed schema.sql
 var schema string
 
-// Migrate creates the database tables if they do not exist.
+// Migrate crée les tables de la base de données si elles n'existent pas.
 func Migrate(ctx context.Context, db *sql.DB) error {
 	_, err := db.ExecContext(ctx, schema)
 	if err != nil {

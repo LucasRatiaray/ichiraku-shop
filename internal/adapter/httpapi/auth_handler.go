@@ -59,7 +59,7 @@ type resetPasswordRequest struct {
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
 
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -91,7 +91,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
 
 	var req confirmRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -114,7 +114,7 @@ func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
 
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -158,7 +158,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
 	
 	var req forgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -177,7 +177,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
 
 	var req resetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

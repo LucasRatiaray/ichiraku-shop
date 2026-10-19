@@ -1,4 +1,4 @@
-// Command server starts the HTTP server and connects to the database.
+// Command server démarre le serveur HTTP et se connecte à la base de données.
 package main
 
 import (

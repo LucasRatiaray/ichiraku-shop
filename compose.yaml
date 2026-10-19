@@ -11,6 +11,7 @@ services:
     stdin_open: true
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:23234:23234"
     volumes:
       - .:/home/go
     depends_on:
