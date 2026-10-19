@@ -176,3 +176,26 @@ Authorization: Bearer 06ed2d09acaf3ea3775bb736c71ce222a3250901a617d77c1d5ac0d539
 Content-Type: application/json
 
 {"name": "", "category": "ramen", "price_ht": 0}
+
+### ---------- PRODUCTS ----------
+
+### 23. All products
+GET http://localhost:8080/products
+
+### 24. Search by name/description
+GET http://localhost:8080/products?q=porc
+
+### 25. Category + TTC range
+GET http://localhost:8080/products?category=ramen&min_ttc=1000&max_ttc=2000
+
+### 26. HT range
+GET http://localhost:8080/products?max_price=500
+
+### 27. Invalid number → 400
+GET http://localhost:8080/products?min_ttc=abc
+
+### 28. Invalid range → 400
+GET http://localhost:8080/products?min_ttc=2000&max_ttc=1000
+
+### 29. No result → []
+GET http://localhost:8080/products?q=pizza

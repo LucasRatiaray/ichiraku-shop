@@ -25,5 +25,7 @@ func NewRouter(auth *AuthHandler, products *ProductHandler) http.Handler {
 
 	mux.HandleFunc("POST /admin/products", auth.RequireAdmin(products.Create))
 
+	mux.HandleFunc("GET /products", products.Search)
+
 	return mux
 }

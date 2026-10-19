@@ -57,3 +57,24 @@ func (s *ProductService) Create(ctx context.Context, name, description, category
 
 	return domain.Product{}, fmt.Errorf("generate product id: %w", domain.ErrConflict)
 }
+
+func (s *ProductService) Search(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error) {
+	f.Query = strings.TrimSpace(f.Query)
+	f.Category = strings.TrimSpace(f.Category)
+
+	if f.MinPriceHT < 0 || f.MaxPriceHT < 0 || f.MinPriceTTC < 0 || f.MaxPriceTTC < 0 {
+		return nil, domain.ErrInvalidInput
+	}
+	if f.MaxPriceHT > 0 && f.MinPriceHT > f.MaxPriceHT {
+		return nil, domain.ErrInvalidInput
+	}
+	if f.MaxPriceTTC > 0 && f.MinPriceTTC > f.MaxPriceTTC {
+		return nil, domain.ErrInvalidInput
+	}
+
+	products, err := s.products.Search(ctx, f)
+	if err != nil {
+		return nil, fmt.Errorf("search products: %w", err)
+	}
+	return products, nil
+}
