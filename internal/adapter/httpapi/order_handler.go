@@ -40,6 +40,7 @@ type orderResponse struct {
 	TotalTTC     int64               `json:"total_ttc"`
 	Items        []orderItemResponse `json:"items"`
 	CreatedAt    time.Time           `json:"created_at"`
+	UserEmail 	 string 						 `json:"user_email"`
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -60,6 +61,7 @@ func toOrderResponse(o domain.Order) orderResponse {
 		TotalTTC:     o.TotalTTC,
 		Items:        items,
 		CreatedAt:    o.CreatedAt,
+		UserEmail: 		o.UserEmail,
 	}
 }
 
@@ -104,4 +106,54 @@ func (h *OrderHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, toOrderResponse(o))
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type changeStatusRequest struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+}
+
+func writeOrders(w http.ResponseWriter, orders []domain.Order) {
+	resp := make([]orderResponse, 0, len(orders))
+	for _, o := range orders {
+		resp = append(resp, toOrderResponse(o))
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *OrderHandler) ListAll(w http.ResponseWriter, r *http.Request) {
+	orders, err := h.orders.ListAll(r.Context())
+	if err != nil {
+		log.Printf("list all orders: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeOrders(w, orders)
+}
+
+func (h *OrderHandler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req changeStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	o, err := h.orders.ChangeStatus(r.Context(), r.PathValue("orderID"), domain.OrderStatus(req.Status), req.Reason)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, toOrderResponse(o))
+	case errors.Is(err, domain.ErrNotFound):
+		writeError(w, http.StatusNotFound, "order not found")
+	case errors.Is(err, domain.ErrInvalidStatus), errors.Is(err, domain.ErrCancelReasonRequired):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domain.ErrInvalidTransition):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, domain.ErrConflict):
+		writeError(w, http.StatusConflict, "order was modified meanwhile, reload and retry")
+	default:
+		log.Printf("change order status: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+	}
 }

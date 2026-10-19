@@ -82,10 +82,11 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID int64) ([]domai
 }
 
 func (r *OrderRepository) list(ctx context.Context, where string, args ...any) ([]domain.Order, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT o.id, o.business_id, o.user_id, o.status, o.cancel_reason, o.total_ttc, o.created_at
-		FROM orders o `+where+`
-		ORDER BY o.created_at DESC`, args...)
+rows, err := r.db.QueryContext(ctx, `
+	SELECT o.id, o.business_id, o.user_id, u.email, o.status, o.cancel_reason, o.total_ttc, o.created_at
+	FROM orders o
+	JOIN users u ON u.id = o.user_id `+where+`
+	ORDER BY o.created_at DESC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list orders: %w", err)
 	}
@@ -95,7 +96,7 @@ func (r *OrderRepository) list(ctx context.Context, where string, args ...any) (
 	index := make(map[int64]int)
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.BusinessID, &o.UserID, &o.Status, &o.CancelReason, &o.TotalTTC, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.BusinessID, &o.UserID, &o.UserEmail, &o.Status, &o.CancelReason, &o.TotalTTC, &o.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
 		index[o.ID] = len(orders)
@@ -128,4 +129,36 @@ func (r *OrderRepository) list(ctx context.Context, where string, args ...any) (
 		return nil, fmt.Errorf("iterate order items: %w", err)
 	}
 	return orders, nil
+}
+
+func (r *OrderRepository) ListAll(ctx context.Context) ([]domain.Order, error) {
+	return r.list(ctx, "")
+}
+
+func (r *OrderRepository) FindByBusinessID(ctx context.Context, businessID string) (domain.Order, error) {
+	orders, err := r.list(ctx, "WHERE o.business_id = $1", businessID)
+	if err != nil {
+		return domain.Order{}, err
+	}
+	if len(orders) == 0 {
+		return domain.Order{}, domain.ErrNotFound
+	}
+	return orders[0], nil
+}
+
+func (r *OrderRepository) UpdateStatus(ctx context.Context, id int64, from, to domain.OrderStatus, cancelReason string) error {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE orders SET status = $1, cancel_reason = $2 WHERE id = $3 AND status = $4`,
+		to, cancelReason, id, from)
+	if err != nil {
+		return fmt.Errorf("update order status: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update order status: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrConflict
+	}
+	return nil
 }

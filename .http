@@ -295,3 +295,67 @@ Authorization: Bearer ac2b36276f4953f4ab9f760f55ea47a755e75a16b1c25daacc498502f0
 
 ### 46. No token → 401
 GET http://localhost:8080/orders
+
+### 47. Admin: all orders
+GET http://localhost:8080/admin/orders
+Authorization: Bearer 3c06995beac15385763fc706bb1f6718ab154c1e30652466df1f4934f3b82a04
+
+### 48. User on admin route → 403
+GET http://localhost:8080/admin/orders
+Authorization: Bearer <token user>
+
+### 49. paid → shipping → 200
+PATCH http://localhost:8080/admin/orders/CMD-HWLLXN/status
+Authorization: Bearer 3c06995beac15385763fc706bb1f6718ab154c1e30652466df1f4934f3b82a04
+Content-Type: application/json
+
+{"status": "shipping"}
+
+### 50. shipping → paid → 409 (not allowed)
+PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "paid"}
+
+### 51. shipping → delivered → 200
+PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "delivered"}
+
+### 52. delivered → cancelled → 409 (final state)
+PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "cancelled", "reason": "test"}
+
+### 53. Cancel without reason (another paid order) → 400
+PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "cancelled"}
+
+### 54. Cancel with reason → 200
+PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "cancelled", "reason": "Rupture fournisseur"}
+
+### 55. Unknown status → 400
+PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "lost"}
+
+### 56. Unknown order → 404
+PATCH http://localhost:8080/admin/orders/CMD-000000/status
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"status": "shipping"}

@@ -35,5 +35,8 @@ func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandl
 	mux.HandleFunc("POST /orders", auth.RequireAuth(orders.Checkout))
 	mux.HandleFunc("GET /orders", auth.RequireAuth(orders.ListMine))
 
+	mux.HandleFunc("GET /admin/orders", auth.RequireAdmin(orders.ListAll))
+	mux.HandleFunc("PATCH /admin/orders/{orderID}/status", auth.RequireAdmin(orders.ChangeStatus))
+
 	return mux
 }

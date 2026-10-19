@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
@@ -66,4 +67,29 @@ func (s *OrderService) ListMine(ctx context.Context, userID int64) ([]domain.Ord
 		return nil, fmt.Errorf("list orders: %w", err)
 	}
 	return orders, nil
+}
+
+func (s *OrderService) ListAll(ctx context.Context) ([]domain.Order, error) {
+	orders, err := s.orders.ListAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list all orders: %w", err)
+	}
+	return orders, nil
+}
+
+func (s *OrderService) ChangeStatus(ctx context.Context, orderID string, to domain.OrderStatus, reason string) (domain.Order, error) {
+	o, err := s.orders.FindByBusinessID(ctx, strings.ToUpper(strings.TrimSpace(orderID)))
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	from := o.Status
+	if err := o.ChangeStatus(to, reason); err != nil {
+		return domain.Order{}, err
+	}
+
+	if err := s.orders.UpdateStatus(ctx, o.ID, from, o.Status, o.CancelReason); err != nil {
+		return domain.Order{}, err
+	}
+	return o, nil
 }

@@ -47,4 +47,7 @@ type BasketRepository interface {
 type OrderRepository interface {
 	CreatePaid(ctx context.Context, o *domain.Order, p *domain.Payment, basketID int64) error
 	ListByUser(ctx context.Context, userID int64) ([]domain.Order, error)
+	ListAll(ctx context.Context) ([]domain.Order, error)
+	FindByBusinessID(ctx context.Context, businessID string) (domain.Order, error)
+	UpdateStatus(ctx context.Context, id int64, from, to domain.OrderStatus, cancelReason string) error
 }
