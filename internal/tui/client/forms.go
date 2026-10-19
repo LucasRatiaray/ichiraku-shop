@@ -7,7 +7,6 @@ func newMenuForm() *huh.Form {
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Key("choice").
-				Title("Ichiraku Shop").
 				Options(
 					huh.NewOption("Se connecter", "login"),
 					huh.NewOption("Créer un compte", "register"),

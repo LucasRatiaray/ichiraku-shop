@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"charm.land/bubbles/v2/spinner"
 )
 
 type screen int
@@ -28,13 +29,15 @@ type Model struct {
 	err      string
 	info     string
 	quitting bool
+	spinner  spinner.Model
 }
 
 func New(api *apiclient.Client) Model {
 	return Model{
-		api:    api,
-		screen: screenMenu,
-		form:   newMenuForm(),
+		api:     api,
+		screen:  screenMenu,
+		form:    newMenuForm(),
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 	}
 }
 
@@ -42,8 +45,20 @@ func (m Model) Init() tea.Cmd {
 	return m.form.Init()
 }
 
+func (m Model) startLoading(cmd tea.Cmd) (Model, tea.Cmd) {
+	m.loading = true
+	return m, tea.Batch(cmd, m.spinner.Tick)
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if !m.loading {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -162,38 +177,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case screenLogin:
-		m.loading = true
-		return m, loginCmd(m.api, m.form.GetString("email"), m.form.GetString("password"))
+		return m.startLoading(loginCmd(m.api, m.form.GetString("email"), m.form.GetString("password")))
 
 	case screenRegister:
 		m.email = m.form.GetString("email")
-		m.loading = true
-		return m, registerCmd(m.api, m.email, m.form.GetString("password"))
+		return m.startLoading(registerCmd(m.api, m.email, m.form.GetString("password")))
 
 	case screenConfirm:
-		m.loading = true
-		return m, confirmCmd(m.api, m.email, m.form.GetString("code"))
+		return m.startLoading(confirmCmd(m.api, m.email, m.form.GetString("code")))
 
 	case screenForgot:
 		m.email = m.form.GetString("email")
-		m.loading = true
-		return m, forgotCmd(m.api, m.email)
+		return m.startLoading(forgotCmd(m.api, m.email))
 
 	case screenReset:
-		m.loading = true
-		return m, resetCmd(m.api, m.email, m.form.GetString("code"), m.form.GetString("password"))
+		return m.startLoading(resetCmd(m.api, m.email, m.form.GetString("code"), m.form.GetString("password")))
 
 	case screenHome:
 		m.err = ""
 		m.info = ""
 		switch m.form.GetString("choice") {
 		case "logout":
-			m.loading = true
-			return m, logoutCmd(m.api, m.token)
+			return m.startLoading(logoutCmd(m.api, m.token))
 		case "quit":
 			m.quitting = true
-			m.loading = true
-			return m, logoutCmd(m.api, m.token)
+			return m.startLoading(logoutCmd(m.api, m.token))
 		case "catalog", "cart":
 			m.info = "Bientôt disponible."
 			m.form = newHomeForm()
@@ -205,16 +213,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
+	s := titleStyle.Render("🍜 Ichiraku Shop") + "\n\n"
+
 	if m.loading {
-		return tea.NewView("Chargement…\n")
+		s += m.spinner.View() + " Chargement…\n"
+		return tea.NewView(s)
 	}
 
-	s := m.form.View()
+	s += m.form.View()
 	if m.err != "" {
-		s += "\n" + m.err + "\n"
+		s += "\n" + errStyle.Render("✗ "+m.err) + "\n"
 	}
 	if m.info != "" {
-		s += "\n" + m.info + "\n"
+		s += "\n" + infoStyle.Render("✓ "+m.info) + "\n"
 	}
+	s += "\n" + helpStyle.Render("↑/↓ naviguer • entrée valider • ctrl+c quitter")
 	return tea.NewView(s)
 }
