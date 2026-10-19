@@ -10,8 +10,8 @@ import (
 	"charm.land/wish/v2"
 	"charm.land/wish/v2/activeterm"
 	"charm.land/wish/v2/bubbletea"
-	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/client"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/client"
 )
 
 func main() {

@@ -1,10 +1,10 @@
 package client
 
 import (
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
-	"charm.land/bubbles/v2/spinner"
 )
 
 type screen int

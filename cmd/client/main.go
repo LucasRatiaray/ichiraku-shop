@@ -6,8 +6,8 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/client"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/client"
 )
 
 func main() {

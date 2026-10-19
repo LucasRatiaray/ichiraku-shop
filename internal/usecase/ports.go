@@ -30,3 +30,8 @@ type SessionRepository interface {
 	FindValid(ctx context.Context, tokenHash string) (domain.Session, error)
 	Delete(ctx context.Context, tokenHash string) error
 }
+
+type ProductRepository interface {
+	Create(ctx context.Context, p *domain.Product) error
+	FindByBusinessID(ctx context.Context, businessID string) (domain.Product, error)
+}

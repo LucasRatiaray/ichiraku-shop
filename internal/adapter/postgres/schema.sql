@@ -23,3 +23,13 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS products (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    business_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL,
+    price_ht BIGINT NOT NULL CHECK (price_ht >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -10,4 +10,5 @@ var (
 	ErrInvalidCredentials  = errors.New("invalid email or password")
 	ErrAccountNotConfirmed = errors.New("account not confirmed")
 	ErrUnauthorized        = errors.New("unauthorized")
+	ErrConflict            = errors.New("conflict")
 )
