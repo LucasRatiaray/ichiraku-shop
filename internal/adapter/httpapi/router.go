@@ -17,6 +17,12 @@ func NewRouter(auth *AuthHandler) http.Handler {
 
 	mux.HandleFunc("GET /auth/me", auth.RequireAuth(auth.Me))
 
+	mux.HandleFunc("POST /auth/password/forgot", auth.ForgotPassword)
+
+	mux.HandleFunc("POST /auth/password/reset", auth.ResetPassword)
+	
+	mux.HandleFunc("POST /auth/logout", auth.RequireAuth(auth.Logout))
+
 	return mux
 }
  

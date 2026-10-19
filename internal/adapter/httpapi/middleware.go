@@ -14,9 +14,8 @@ type userCtxKey struct{}
 
 func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		header := r.Header.Get("Authorization")
-		token, ok := strings.CutPrefix(header, "Bearer ")
-		if !ok || token == "" {
+		token, ok := bearerToken(r)
+		if !ok {
 			writeError(w, http.StatusUnauthorized, "missing token")
 			return
 		}
@@ -41,4 +40,10 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 func userFromContext(ctx context.Context) (domain.User, bool) {
 	user, ok := ctx.Value(userCtxKey{}).(domain.User)
 	return user, ok
+}
+
+func bearerToken(r *http.Request) (string, bool) {
+	header := r.Header.Get("Authorization")
+	token, ok := strings.CutPrefix(header, "Bearer ")
+	return token, ok && token != ""
 }

@@ -38,9 +38,9 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	query := `SELECT id, email, password_hash, role, status, created_at FROM users WHERE email = $1`
-	var u domain.User
+	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, email).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -48,14 +48,14 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 		return domain.User{}, fmt.Errorf("find user by email: %w", err)
 	}
 
-	return u, nil
+	return user, nil
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (domain.User, error) {
 	query := `SELECT id, email, password_hash, role, status, created_at FROM users WHERE id = $1`
-	var u domain.User
+	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -63,7 +63,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (domain.User, e
 		return domain.User{}, fmt.Errorf("find user by id: %w", err)
 	}
 
-	return u, nil
+	return user, nil
 }
 
 func (r *UserRepository) Update(ctx context.Context, user domain.User) error {
@@ -100,11 +100,11 @@ func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
 
 	var users []domain.User
 	for rows.Next() {
-		var u domain.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt); err != nil {
+		var user domain.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt); err != nil {
 			return nil, fmt.Errorf("list users: %w", err)
 		}
-		users = append(users, u)
+		users = append(users, user)
 	}
 
 	if err := rows.Err(); err != nil {

@@ -1,8 +1,10 @@
 @baseUrl = http://localhost:8080
-@token = 52d8054039ed1dcb73ae76cc064fda9eda1da57b06cb6ca2da1596ee39346064
+@token = f751d8e38c6dc16559b4c793212110d4bd26fd7670e013460b3fc8c3d56bf42c
 
-### Health
+### 0. Health → 200
 GET {{baseUrl}}/health
+
+### ---------- INSCRIPTION ----------
 
 ### 1. Inscription valide → 201
 POST {{baseUrl}}/auth/register
@@ -35,15 +37,17 @@ Content-Type: application/json
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
-{ "email": "cassé@test.fr", }
+{ "email": "casse@test.fr",}
 
-### 5. Confirmation → 204
+### ---------- CONFIRMATION ----------
+
+### 5. Confirmation avec le code des logs → 204
 POST {{baseUrl}}/auth/confirm
 Content-Type: application/json
 
 {
   "email": "lucas@test.fr",
-  "code": "665538"
+  "code": "123456"
 }
 
 ### 6. Code faux → 400
@@ -54,6 +58,8 @@ Content-Type: application/json
   "email": "lucas@test.fr",
   "code": "000000"
 }
+
+### ---------- CONNEXION ----------
 
 ### 7. Connexion → 200 + token
 POST {{baseUrl}}/auth/login
@@ -73,6 +79,8 @@ Content-Type: application/json
   "password": "mauvais123"
 }
 
+### ---------- ROUTE PROTÉGÉE ----------
+
 ### 9. Profil avec token → 200
 GET {{baseUrl}}/auth/me
 Authorization: Bearer {{token}}
@@ -83,3 +91,59 @@ GET {{baseUrl}}/auth/me
 ### 11. Faux token → 401
 GET {{baseUrl}}/auth/me
 Authorization: Bearer nimportequoi
+
+### ---------- MOT DE PASSE OUBLIÉ ----------
+
+### 12. Mot de passe oublié → 204 + code reset dans les logs
+POST {{baseUrl}}/auth/password/forgot
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr"
+}
+
+### 13. Email inconnu → 204, aucun code dans les logs
+POST {{baseUrl}}/auth/password/forgot
+Content-Type: application/json
+
+{
+  "email": "inconnu@test.fr"
+}
+
+### 14. Reset avec le code des logs → 204
+POST {{baseUrl}}/auth/password/reset
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "code": "559844",
+  "new_password": "nouveaumdp123"
+}
+
+### 15. Login ancien mot de passe → 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "motdepasse123"
+}
+
+### 16. Login nouveau mot de passe → 200 + token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lucas@test.fr",
+  "password": "nouveaumdp123"
+}
+
+### ---------- DÉCONNEXION ----------
+
+### 17. Logout → 204
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+
+### 18. Me avec le token déconnecté → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}

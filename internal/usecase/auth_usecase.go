@@ -46,14 +46,14 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
-	u := domain.User{
+	user := domain.User{
 		Email:        email,
 		PasswordHash: string(hash),
 		Role:         domain.RoleUser,
 		Status:       domain.StatusPending,
 	}
 
-	if err := s.users.Create(ctx, &u); err != nil {
+	if err := s.users.Create(ctx, &user); err != nil {
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
@@ -63,7 +63,7 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 	}
 
 	vc := domain.VerificationCode{
-		UserID:    u.ID,
+		UserID:    user.ID,
 		Code:      code,
 		Purpose:   domain.PurposeConfirm,
 		ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -73,17 +73,17 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
-	if err := s.mailer.SendCode(ctx, u.Email, code, domain.PurposeConfirm); err != nil {
+	if err := s.mailer.SendCode(ctx, user.Email, code, domain.PurposeConfirm); err != nil {
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
-	return u, nil
+	return user, nil
 }
 
 func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	u, err := s.users.FindByEmail(ctx, email)
+	user, err := s.users.FindByEmail(ctx, email)
 	if errors.Is(err, domain.ErrNotFound) {
 		return domain.ErrInvalidCode
 	}
@@ -91,11 +91,11 @@ func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 		return fmt.Errorf("confirm: %w", err)
 	}
 
-	if u.Status != domain.StatusPending {
+	if user.Status != domain.StatusPending {
 		return domain.ErrInvalidCode
 	}
 
-	vc, err := s.codes.FindValid(ctx, u.ID, code, domain.PurposeConfirm)
+	vc, err := s.codes.FindValid(ctx, user.ID, code, domain.PurposeConfirm)
 	if errors.Is(err, domain.ErrNotFound) {
 		return domain.ErrInvalidCode
 	}
@@ -111,8 +111,8 @@ func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 		return fmt.Errorf("confirm: %w", err)
 	}
 
-	u.Status = domain.StatusActive
-	if err := s.users.Update(ctx, u); err != nil {
+	user.Status = domain.StatusActive
+	if err := s.users.Update(ctx, user); err != nil {
 		return fmt.Errorf("confirm: %w", err)
 	}
 	return nil
@@ -121,7 +121,7 @@ func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	u, err := s.users.FindByEmail(ctx, email)
+	user, err := s.users.FindByEmail(ctx, email)
 	if errors.Is(err, domain.ErrNotFound) {
 		return "", domain.ErrInvalidCredentials
 	}
@@ -129,7 +129,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", fmt.Errorf("login: %w", err)
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 		return "", domain.ErrInvalidCredentials
 	}
@@ -137,11 +137,11 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", fmt.Errorf("login: %w", err)
 	}
 
-	if u.Status == domain.StatusPending {
+	if user.Status == domain.StatusPending {
 		return "", domain.ErrAccountNotConfirmed
 	}
 
-	if u.Status == domain.StatusDisabled {
+	if user.Status == domain.StatusDisabled {
 		return "", domain.ErrInvalidCredentials
 	}
 
@@ -151,7 +151,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	}
 
 	sess := domain.Session{
-		UserID:    u.ID,
+		UserID:    user.ID,
 		TokenHash: hashToken(token),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
@@ -172,7 +172,7 @@ func (s *AuthService) Authenticate(ctx context.Context, token string) (domain.Us
 		return domain.User{}, fmt.Errorf("authenticate: %w", err)
 	}
 
-	u, err := s.users.FindByID(ctx, sess.UserID)
+	user, err := s.users.FindByID(ctx, sess.UserID)
 	if errors.Is(err, domain.ErrNotFound) {
 		return domain.User{}, domain.ErrUnauthorized
 	}
@@ -180,9 +180,102 @@ func (s *AuthService) Authenticate(ctx context.Context, token string) (domain.Us
 		return domain.User{}, fmt.Errorf("authenticate: %w", err)
 	}
 
-	if u.Status != domain.StatusActive {
+	if user.Status != domain.StatusActive {
 		return domain.User{}, domain.ErrUnauthorized
 	}
 
-	return u, nil
+	return user, nil
+}
+
+func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	user, err := s.users.FindByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("request reset: %w", err)
+	}
+
+	if user.Status != domain.StatusActive {
+		return nil
+	}
+
+	code, err := generateCode()
+	if err != nil {
+		return fmt.Errorf("request reset: %w", err)
+	}
+
+	vc := domain.VerificationCode{
+		UserID:    user.ID,
+		Code:      code,
+		Purpose:   domain.PurposeReset,
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+	}
+
+	if err := s.codes.Create(ctx, &vc); err != nil {
+		return fmt.Errorf("request reset: %w", err)
+	}
+
+	if err := s.mailer.SendCode(ctx, user.Email, code, domain.PurposeReset); err != nil {
+		return fmt.Errorf("request reset: %w", err)
+	}
+
+	return nil
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	if len(newPassword) < 8 || len(newPassword) > 72 {
+		return domain.ErrInvalidInput
+	}
+
+	user, err := s.users.FindByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+
+	vc, err := s.codes.FindValid(ctx, user.ID, code, domain.PurposeReset)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+
+	err = s.codes.MarkUsed(ctx, vc.ID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+
+	user.PasswordHash = string(hash)
+	if err := s.users.Update(ctx, user); err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+	
+	return nil
+}
+
+func (s *AuthService) Logout(ctx context.Context, token string) error {
+	err := s.sessions.Delete(ctx, hashToken(token))
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrUnauthorized
+	}
+	if err != nil {
+		return fmt.Errorf("logout: %w", err)
+	}
+	return nil
 }

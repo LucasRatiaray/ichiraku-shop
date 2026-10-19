@@ -48,6 +48,16 @@ type loginResponse struct {
 	Token string `json:"token"`
 }
 
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type resetPasswordRequest struct {
+	Email       string `json:"email"`
+	Code        string `json:"code"`
+	NewPassword string `json:"new_password"`
+}
+
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
 
@@ -145,4 +155,61 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		Status:    string(user.Status),
 		CreatedAt: user.CreatedAt,
 	})
+}
+
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+	
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	err := h.auth.RequestPasswordReset(r.Context(), req.Email)
+	if err != nil {
+		log.Printf("forgot password: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limit request body to 1MB: to prevent memory exhaustion.
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	err := h.auth.ResetPassword(r.Context(), req.Email, req.Code, req.NewPassword)
+	switch {
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, "password must be 8 to 72 characters")
+		return
+	case errors.Is(err, domain.ErrInvalidCode):
+		writeError(w, http.StatusBadRequest, "invalid or expired code")
+		return
+	case err != nil:
+		log.Printf("reset password: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	token, _ := bearerToken(r)
+	err := h.auth.Logout(r.Context(), token)
+	if err != nil {
+		log.Printf("logout: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
