@@ -31,5 +31,8 @@ CREATE TABLE IF NOT EXISTS products (
     description TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL,
     price_ht BIGINT NOT NULL CHECK (price_ht >= 0),
+    vat_rate BIGINT NOT NULL DEFAULT 2000,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS vat_rate BIGINT NOT NULL DEFAULT 2000;

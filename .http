@@ -47,7 +47,7 @@ Content-Type: application/json
 
 {
   "email": "lucas@test.fr",
-  "code": "123456"
+  "code": "568277"
 }
 
 ### 6. Code faux → 400
@@ -147,3 +147,32 @@ Authorization: Bearer {{token}}
 ### 18. Me avec le token déconnecté → 401
 GET {{baseUrl}}/auth/me
 Authorization: Bearer {{token}}
+
+### ---------- ADMIN ----------
+
+### 19. Login admin
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{"email": "admin@test.fr", "password": "adminmdp123"}
+
+### 20. Create product (admin) → 201
+POST http://localhost:8080/admin/products
+Authorization: Bearer 06ed2d09acaf3ea3775bb736c71ce222a3250901a617d77c1d5ac0d5397a2ff0
+Content-Type: application/json
+
+{"name": "Ramen Tonkotsu", "description": "Bouillon de porc 12h", "category": "ramen", "price_ht": 1250}
+
+### 21. Create product (user token) → 403
+POST http://localhost:8080/admin/products
+Authorization: Bearer e9f55099fefbe8cbfe5c6239689803a1179f52bd3c2f54660c8bc4caed8b748a
+Content-Type: application/json
+
+{"name": "Test", "category": "ramen", "price_ht": 100}
+
+### 22. Create product invalid → 400
+POST http://localhost:8080/admin/products
+Authorization: Bearer 06ed2d09acaf3ea3775bb736c71ce222a3250901a617d77c1d5ac0d5397a2ff0
+Content-Type: application/json
+
+{"name": "", "category": "ramen", "price_ht": 0}

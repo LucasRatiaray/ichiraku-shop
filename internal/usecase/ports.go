@@ -34,4 +34,5 @@ type SessionRepository interface {
 type ProductRepository interface {
 	Create(ctx context.Context, p *domain.Product) error
 	FindByBusinessID(ctx context.Context, businessID string) (domain.Product, error)
+	Search(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error)
 }

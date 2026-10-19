@@ -2,7 +2,7 @@ package httpapi
 
 import "net/http"
 
-func NewRouter(auth *AuthHandler) http.Handler {
+func NewRouter(auth *AuthHandler, products *ProductHandler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +22,8 @@ func NewRouter(auth *AuthHandler) http.Handler {
 	mux.HandleFunc("POST /auth/password/reset", auth.ResetPassword)
 
 	mux.HandleFunc("POST /auth/logout", auth.RequireAuth(auth.Logout))
+
+	mux.HandleFunc("POST /admin/products", auth.RequireAdmin(products.Create))
 
 	return mux
 }

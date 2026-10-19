@@ -13,6 +13,15 @@ type Product struct {
 	CreatedAt   time.Time
 }
 
+type ProductFilter struct {
+	Query       string // nom ou description
+	Category    string
+	MinPriceHT  int64
+	MaxPriceHT  int64
+	MinPriceTTC int64
+	MaxPriceTTC int64
+}
+
 const VATRate = 2000
 
 func (p Product) PriceTTC() int64 {

@@ -59,10 +59,13 @@ func main() {
 	}
 
 	authHandler := httpapi.NewAuthHandler(authService)
+	productRepo := postgres.NewProductRepository(db)
+	productService := usecase.NewProductService(productRepo)
+	productHandler := httpapi.NewProductHandler(productService)
 
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           httpapi.NewRouter(authHandler),
+		Handler:           httpapi.NewRouter(authHandler, productHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
