@@ -130,3 +130,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Token: token,
 	})
 }
+
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, userResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		Role:      string(user.Role),
+		Status:    string(user.Status),
+		CreatedAt: user.CreatedAt,
+	})
+}

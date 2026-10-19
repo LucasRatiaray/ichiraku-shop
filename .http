@@ -1,4 +1,5 @@
 @baseUrl = http://localhost:8080
+@token = 52d8054039ed1dcb73ae76cc064fda9eda1da57b06cb6ca2da1596ee39346064
 
 ### Health
 GET {{baseUrl}}/health
@@ -71,3 +72,14 @@ Content-Type: application/json
   "email": "lucas@test.fr",
   "password": "mauvais123"
 }
+
+### 9. Profil avec token → 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### 10. Sans token → 401
+GET {{baseUrl}}/auth/me
+
+### 11. Faux token → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer nimportequoi
