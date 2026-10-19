@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
+
+	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 )
 
 type Client struct {
@@ -130,4 +134,43 @@ func (c *Client) ResetPassword(ctx context.Context, email, code, newPassword str
 		"new_password": newPassword,
 	}
 	return c.do(ctx, http.MethodPost, "/auth/password/reset", "", body, nil)
+}
+
+type Product struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	PriceHT     int64  `json:"price_ht"`
+	PriceTTC    int64  `json:"price_ttc"`
+}
+
+func (c *Client) SearchProducts(ctx context.Context, f domain.ProductFilter) ([]Product, error) {
+	q := url.Values{}
+	if f.Query != "" {
+		q.Set("q", f.Query)
+	}
+	if f.Category != "" {
+		q.Set("category", f.Category)
+	}
+	setInt := func(key string, v int64) {
+		if v > 0 {
+			q.Set(key, strconv.FormatInt(v, 10))
+		}
+	}
+	setInt("min_price", f.MinPriceHT)
+	setInt("max_price", f.MaxPriceHT)
+	setInt("min_ttc", f.MinPriceTTC)
+	setInt("max_ttc", f.MaxPriceTTC)
+
+	path := "/products"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+
+	var products []Product
+	if err := c.do(ctx, http.MethodGet, path, "", nil, &products); err != nil {
+		return nil, err
+	}
+	return products, nil
 }
