@@ -15,6 +15,8 @@ const (
 	screenLogin
 	screenRegister
 	screenConfirm
+	screenForgot
+	screenReset
 	screenHome
 )
 
@@ -85,6 +87,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenLogin
 		m.form = newLoginForm()
 		return m, m.form.Init()
+
+	case forgotResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newForgotForm()
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.info = "Si ce compte existe, un code a été envoyé."
+		m.screen = screenReset
+		m.form = newResetForm()
+		return m, m.form.Init()
+
+	case resetResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newResetForm()
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.info = "Mot de passe modifié, tu peux te connecter."
+		m.screen = screenLogin
+		m.form = newLoginForm()
+		return m, m.form.Init()
 	}
 
 	if m.screen == screenHome || m.loading {
@@ -102,6 +130,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.screen {
 	case screenMenu:
+		m.err = ""
+		m.info = ""
 		switch m.form.GetString("choice") {
 		case "login":
 			m.screen = screenLogin
@@ -110,6 +140,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "register":
 			m.screen = screenRegister
 			m.form = newRegisterForm()
+			return m, m.form.Init()
+		case "forgot":
+			m.screen = screenForgot
+			m.form = newForgotForm()
 			return m, m.form.Init()
 		case "quit":
 			return m, tea.Quit
@@ -127,6 +161,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenConfirm:
 		m.loading = true
 		return m, confirmCmd(m.api, m.email, m.form.GetString("code"))
+
+	case screenForgot:
+		m.email = m.form.GetString("email")
+		m.loading = true
+		return m, forgotCmd(m.api, m.email)
+
+	case screenReset:
+		m.loading = true
+		return m, resetCmd(m.api, m.email, m.form.GetString("code"), m.form.GetString("password"))
 	}
 
 	return m, cmd
@@ -159,6 +202,7 @@ func newMenuForm() *huh.Form {
 				Options(
 					huh.NewOption("Se connecter", "login"),
 					huh.NewOption("Créer un compte", "register"),
+					huh.NewOption("Mot de passe oublié", "forgot"),
 					huh.NewOption("Quitter", "quit"),
 				),
 		),
@@ -191,6 +235,22 @@ func newConfirmForm() *huh.Form {
 	)
 }
 
+func newForgotForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("email").Title("Email du compte"),
+		),
+	)
+}
+
+func newResetForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("code").Title("Code reçu par email"),
+			huh.NewInput().Key("password").Title("Nouveau mot de passe (8 caractères min.)").EchoMode(huh.EchoModePassword),
+		),
+	)
+}
 
 type loginResultMsg struct {
 	token string
@@ -223,5 +283,27 @@ func confirmCmd(api *apiclient.Client, email, code string) tea.Cmd {
 	return func() tea.Msg {
 		err := api.Confirm(context.Background(), email, code)
 		return confirmResultMsg{err: err}
+	}
+}
+
+type forgotResultMsg struct {
+	err error
+}
+
+func forgotCmd(api *apiclient.Client, email string) tea.Cmd {
+	return func() tea.Msg {
+		err := api.ForgotPassword(context.Background(), email)
+		return forgotResultMsg{err: err}
+	}
+}
+
+type resetResultMsg struct {
+	err error
+}
+
+func resetCmd(api *apiclient.Client, email, code, password string) tea.Cmd {
+	return func() tea.Msg {
+		err := api.ResetPassword(context.Background(), email, code, password)
+		return resetResultMsg{err: err}
 	}
 }

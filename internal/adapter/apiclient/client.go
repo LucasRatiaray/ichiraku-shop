@@ -117,3 +117,17 @@ func (c *Client) Login(ctx context.Context, email, password string) (string, err
 func (c *Client) Logout(ctx context.Context, token string) error {
 	return c.do(ctx, http.MethodPost, "/auth/logout", token, nil, nil)
 }
+
+func (c *Client) ForgotPassword(ctx context.Context, email string) error {
+	body := map[string]string{"email": email}
+	return c.do(ctx, http.MethodPost, "/auth/password/forgot", "", body, nil)
+}
+
+func (c *Client) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	body := map[string]string{
+		"email":        email,
+		"code":         code,
+		"new_password": newPassword,
+	}
+	return c.do(ctx, http.MethodPost, "/auth/password/reset", "", body, nil)
+}
