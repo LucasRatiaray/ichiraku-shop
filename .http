@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:8080
-@token = f751d8e38c6dc16559b4c793212110d4bd26fd7670e013460b3fc8c3d56bf42c
+@token = bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
 
 ### 0. Health → 200
 GET {{baseUrl}}/health
@@ -158,7 +158,7 @@ Content-Type: application/json
 
 ### 20. Create product (admin) → 201
 POST http://localhost:8080/admin/products
-Authorization: Bearer 06ed2d09acaf3ea3775bb736c71ce222a3250901a617d77c1d5ac0d5397a2ff0
+Authorization: Bearer 
 Content-Type: application/json
 
 {"name": "Ramen Tonkotsu", "description": "Bouillon de porc 12h", "category": "ramen", "price_ht": 1250}
@@ -199,3 +199,49 @@ GET http://localhost:8080/products?min_ttc=2000&max_ttc=1000
 
 ### 29. No result → []
 GET http://localhost:8080/products?q=pizza
+
+### 30. Basket (created on first call)
+GET http://localhost:8080/basket
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+
+### 31. Add item
+POST http://localhost:8080/basket/items
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+Content-Type: application/json
+
+{"product_id": "PDT-5OUSVT", "quantity": 1}
+
+### 32. Add same item again → quantity 3
+POST http://localhost:8080/basket/items
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+Content-Type: application/json
+
+{"product_id": "PDT-5OUSVT", "quantity": 1}
+
+### 33. Set quantity → 5
+PUT http://localhost:8080/basket/items/PDT-XXXXXX
+Authorization: Bearer <token user>
+Content-Type: application/json
+
+{"quantity": 5}
+
+### 34. Unknown product → 404
+POST http://localhost:8080/basket/items
+Authorization: Bearer <token user>
+Content-Type: application/json
+
+{"product_id": "PDT-000000", "quantity": 1}
+
+### 35. Quantity 0 on add → 400
+POST http://localhost:8080/basket/items
+Authorization: Bearer <token user>
+Content-Type: application/json
+
+{"product_id": "PDT-XXXXXX", "quantity": 0}
+
+### 36. Remove item
+DELETE http://localhost:8080/basket/items/PDT-XXXXXX
+Authorization: Bearer <token user>
+
+### 37. No token → 401
+GET http://localhost:8080/basket

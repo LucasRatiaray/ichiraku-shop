@@ -63,9 +63,13 @@ func main() {
 	productService := usecase.NewProductService(productRepo)
 	productHandler := httpapi.NewProductHandler(productService)
 
+	basketRepo := postgres.NewBasketRepository(db)
+	basketService := usecase.NewBasketService(basketRepo, productRepo)
+	basketHandler := httpapi.NewBasketHandler(basketService)
+
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           httpapi.NewRouter(authHandler, productHandler),
+		Handler:           httpapi.NewRouter(authHandler, productHandler, basketHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

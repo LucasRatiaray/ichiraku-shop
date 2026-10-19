@@ -36,3 +36,10 @@ type ProductRepository interface {
 	FindByBusinessID(ctx context.Context, businessID string) (domain.Product, error)
 	Search(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error)
 }
+
+type BasketRepository interface {
+	FindByUserID(ctx context.Context, userID int64) (domain.Basket, error)
+	Create(ctx context.Context, b *domain.Basket) error
+	SetItem(ctx context.Context, basketID, productID int64, quantity int) error
+	RemoveItem(ctx context.Context, basketID, productID int64) error
+}
