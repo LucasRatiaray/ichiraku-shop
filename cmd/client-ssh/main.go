@@ -3,6 +3,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/ssh"
@@ -10,14 +11,21 @@ import (
 	"charm.land/wish/v2/activeterm"
 	"charm.land/wish/v2/bubbletea"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/client"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
 )
 
-func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-	return client.New(), nil
-}
-
 func main() {
-	server, err := wish.NewServer(
+	apiURL := os.Getenv("API_URL")
+	if apiURL == "" {
+		apiURL = "http://localhost:8080"
+	}
+	api := apiclient.New(apiURL)
+
+	teaHandler := func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+		return client.New(api), nil
+	}
+
+	srv, err := wish.NewServer(
 		wish.WithAddress(":23234"),
 		wish.WithHostKeyPath(".ssh/client_ed25519"),
 		wish.WithMiddleware(
@@ -30,7 +38,7 @@ func main() {
 	}
 
 	log.Println("SSH server listening on :23234")
-	if err := server.ListenAndServe(); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
