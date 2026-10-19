@@ -47,6 +47,17 @@ func main() {
 	sessionRepo := postgres.NewSessionRepository(db)
 
 	authService := usecase.NewAuthService(userRepo, codeRepo, mail, sessionRepo)
+
+	adminEmail := os.Getenv("ADMIN_EMAIL")
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminEmail != "" && adminPassword != "" {
+		if err := authService.EnsureAdmin(ctx, adminEmail, adminPassword); err != nil {
+			log.Fatalf("Failed to ensure admin: %v", err)
+		}
+	} else {
+		log.Println("ADMIN_EMAIL/ADMIN_PASSWORD not set: admin seed skipped")
+	}
+
 	authHandler := httpapi.NewAuthHandler(authService)
 
 	srv := &http.Server{

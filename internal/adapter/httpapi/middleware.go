@@ -47,3 +47,14 @@ func bearerToken(r *http.Request) (string, bool) {
 	token, ok := strings.CutPrefix(header, "Bearer ")
 	return token, ok && token != ""
 }
+
+func (h *AuthHandler) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return h.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := userFromContext(r.Context())
+		if !ok || user.Role != domain.RoleAdmin {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		next(w, r)
+	})
+}

@@ -279,3 +279,35 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 	}
 	return nil
 }
+
+func (s *AuthService) EnsureAdmin(ctx context.Context, email, password string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	_, err := s.users.FindByEmail(ctx, email)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("ensure admin: %w", err)
+	}
+
+	if len(password) < 8 || len(password) > 72 {
+		return domain.ErrInvalidInput
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("ensure admin: %w", err)
+	}
+
+	u := domain.User{
+		Email:        email,
+		PasswordHash: string(hash),
+		Role:         domain.RoleAdmin,
+		Status:       domain.StatusActive,
+	}
+	if err := s.users.Create(ctx, &u); err != nil {
+		return fmt.Errorf("ensure admin: %w", err)
+	}
+	return nil
+}
