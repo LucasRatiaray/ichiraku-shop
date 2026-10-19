@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var errInvalidPrice = errors.New("prix invalide (ex : 12,50)")
+var errInvalidPrice = errors.New("invalid price (ex: 12,50)")
 
 func parseEuros(s string) (int64, error) {
 	s = strings.ReplaceAll(strings.TrimSpace(s), ",", ".")

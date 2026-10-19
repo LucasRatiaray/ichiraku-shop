@@ -174,3 +174,38 @@ func (c *Client) SearchProducts(ctx context.Context, f domain.ProductFilter) ([]
 	}
 	return products, nil
 }
+
+type User struct {
+	ID    int64  `json:"id"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+func (c *Client) Me(ctx context.Context, token string) (User, error) {
+	var u User
+	if err := c.do(ctx, http.MethodGet, "/auth/me", token, nil, &u); err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+type createProductRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	PriceHT     int64  `json:"price_ht"`
+}
+
+func (c *Client) CreateProduct(ctx context.Context, token, name, description, category string, priceHT int64) (Product, error) {
+	req := createProductRequest{
+		Name:        name,
+		Description: description,
+		Category:    category,
+		PriceHT:     priceHT,
+	}
+	var p Product
+	if err := c.do(ctx, http.MethodPost, "/admin/products", token, req, &p); err != nil {
+		return Product{}, err
+	}
+	return p, nil
+}
