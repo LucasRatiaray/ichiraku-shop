@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 )
 
 type loginResultMsg struct {
@@ -71,5 +72,17 @@ func logoutCmd(api *apiclient.Client, token string) tea.Cmd {
 	return func() tea.Msg {
 		err := api.Logout(context.Background(), token)
 		return logoutResultMsg{err: err}
+	}
+}
+
+type searchResultMsg struct {
+	products []apiclient.Product
+	err      error
+}
+
+func searchCmd(api *apiclient.Client, f domain.ProductFilter) tea.Cmd {
+	return func() tea.Msg {
+		products, err := api.SearchProducts(context.Background(), f)
+		return searchResultMsg{products: products, err: err}
 	}
 }

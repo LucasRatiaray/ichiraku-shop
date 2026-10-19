@@ -7,4 +7,5 @@ var (
 	errStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F5F"))
 	infoStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#5FD787"))
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
+	nameStyle  = lipgloss.NewStyle().Bold(true)
 )

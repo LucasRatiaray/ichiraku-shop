@@ -17,6 +17,8 @@ const (
 	screenForgot
 	screenReset
 	screenHome
+	screenSearch
+	screenResults
 )
 
 type Model struct {
@@ -30,6 +32,7 @@ type Model struct {
 	info     string
 	quitting bool
 	spinner  spinner.Model
+	products []apiclient.Product
 }
 
 func New(api *apiclient.Client) Model {
@@ -59,9 +62,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		if m.screen == screenSearch && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenHome
+			m.form = newHomeForm()
+			return m, m.form.Init()
+		}
+		if m.screen == screenResults {
+			switch msg.String() {
+			case "n":
+				m.screen = screenSearch
+				m.form = newSearchForm()
+				return m, m.form.Init()
+			case "esc", "q":
+				m.err = ""
+				m.screen = screenHome
+				m.form = newHomeForm()
+				return m, m.form.Init()
+			}
+			return m, nil
 		}
 
 	case loginResultMsg:
@@ -140,6 +164,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenMenu
 		m.form = newMenuForm()
 		return m, m.form.Init()
+
+	case searchResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newSearchForm()
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.products = msg.products
+		m.screen = screenResults
+		return m, nil
 	}
 
 	if m.loading {
@@ -202,11 +238,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "quit":
 			m.quitting = true
 			return m.startLoading(logoutCmd(m.api, m.token))
-		case "catalog", "cart":
+		case "catalog":
+			m.screen = screenSearch
+			m.form = newSearchForm()
+			return m, m.form.Init()
+		case "cart":
 			m.info = "Bientôt disponible."
 			m.form = newHomeForm()
 			return m, m.form.Init()
 		}
+	case screenSearch:
+		return m.startLoading(searchCmd(m.api, filterFromSearchForm(m.form)))
 	}
 
 	return m, cmd
@@ -220,13 +262,24 @@ func (m Model) View() tea.View {
 		return tea.NewView(s)
 	}
 
-	s += m.form.View()
+	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
+	if m.screen == screenResults {
+		s += renderProducts(m.products)
+		help = "n nouvelle recherche • esc retour • ctrl+c quitter"
+	} else {
+		s += m.form.View()
+		if m.screen == screenSearch {
+			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
+		}
+	}
+
 	if m.err != "" {
 		s += "\n" + errStyle.Render("✗ "+m.err) + "\n"
 	}
 	if m.info != "" {
 		s += "\n" + infoStyle.Render("✓ "+m.info) + "\n"
 	}
-	s += "\n" + helpStyle.Render("↑/↓ naviguer • entrée valider • ctrl+c quitter")
+
+	s += "\n" + helpStyle.Render(help)
 	return tea.NewView(s)
 }
