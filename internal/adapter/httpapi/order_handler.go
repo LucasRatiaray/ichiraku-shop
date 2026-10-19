@@ -40,7 +40,7 @@ type orderResponse struct {
 	TotalTTC     int64               `json:"total_ttc"`
 	Items        []orderItemResponse `json:"items"`
 	CreatedAt    time.Time           `json:"created_at"`
-	UserEmail 	 string 						 `json:"user_email"`
+	UserEmail    string              `json:"user_email"`
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -61,7 +61,7 @@ func toOrderResponse(o domain.Order) orderResponse {
 		TotalTTC:     o.TotalTTC,
 		Items:        items,
 		CreatedAt:    o.CreatedAt,
-		UserEmail: 		o.UserEmail,
+		UserEmail:    o.UserEmail,
 	}
 }
 

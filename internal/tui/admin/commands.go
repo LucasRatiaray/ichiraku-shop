@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
@@ -104,5 +105,56 @@ func createOrderCmd(api *apiclient.Client, token, email string, productIDs []str
 		}
 		o, err := api.CreateOrderForUser(context.Background(), token, email, lines)
 		return orderCreatedMsg{order: o, err: err}
+	}
+}
+
+type usersResultMsg struct {
+	users []apiclient.AdminUser
+	err   error
+}
+
+func listUsersCmd(api *apiclient.Client, token string) tea.Cmd {
+	return func() tea.Msg {
+		users, err := api.ListUsers(context.Background(), token)
+		return usersResultMsg{users: users, err: err}
+	}
+}
+
+type userActionMsg struct {
+	info string
+	err  error
+}
+
+func createUserCmd(api *apiclient.Client, token, email, password, role string) tea.Cmd {
+	return func() tea.Msg {
+		user, err := api.CreateUser(context.Background(), token, email, password, role)
+		return userActionMsg{info: "Compte " + user.Email + " créé.", err: err}
+	}
+}
+
+func userActionCmd(api *apiclient.Client, token, idStr, action string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			return userActionMsg{err: err}
+		}
+		switch action {
+		case "delete":
+			return userActionMsg{info: "Compte supprimé.", err: api.DeleteUser(ctx, token, id)}
+		case "confirm", "enable":
+			_, err = api.UpdateUser(ctx, token, id, "", "active")
+			return userActionMsg{info: "Compte activé.", err: err}
+		case "disable":
+			_, err = api.UpdateUser(ctx, token, id, "", "disabled")
+			return userActionMsg{info: "Compte désactivé.", err: err}
+		case "role_admin":
+			_, err = api.UpdateUser(ctx, token, id, "admin", "")
+			return userActionMsg{info: "Rôle admin attribué.", err: err}
+		case "role_user":
+			_, err = api.UpdateUser(ctx, token, id, "user", "")
+			return userActionMsg{info: "Rôle client attribué.", err: err}
+		}
+		return userActionMsg{info: "Aucune action."}
 	}
 }

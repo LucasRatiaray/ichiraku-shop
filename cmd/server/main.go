@@ -71,9 +71,12 @@ func main() {
 	orderService := usecase.NewOrderService(orderRepo, basketRepo, userRepo, productRepo)
 	orderHandler := httpapi.NewOrderHandler(orderService)
 
+	userAdminService := usecase.NewUserAdminService(userRepo)
+	userAdminHandler := httpapi.NewUserAdminHandler(userAdminService)
+
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           httpapi.NewRouter(authHandler, productHandler, basketHandler, orderHandler),
+		Handler:           httpapi.NewRouter(authHandler, productHandler, basketHandler, orderHandler, userAdminHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

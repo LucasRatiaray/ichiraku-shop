@@ -273,7 +273,7 @@ type Order struct {
 	TotalTTC     int64       `json:"total_ttc"`
 	Items        []OrderItem `json:"items"`
 	CreatedAt    time.Time   `json:"created_at"`
-	UserEmail 	 string 		 `json:"user_email"`
+	UserEmail    string      `json:"user_email"`
 }
 
 type checkoutRequest struct {
@@ -326,4 +326,47 @@ func (c *Client) CreateOrderForUser(ctx context.Context, token, email string, it
 	var o Order
 	err := c.do(ctx, http.MethodPost, "/admin/orders", token, adminCreateOrderRequest{UserEmail: email, Items: items}, &o)
 	return o, err
+}
+
+type AdminUser struct {
+	ID        int64     `json:"id"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type adminCreateUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
+type adminUpdateUserRequest struct {
+	Role   string `json:"role,omitempty"`
+	Status string `json:"status,omitempty"`
+}
+
+func (c *Client) ListUsers(ctx context.Context, token string) ([]AdminUser, error) {
+	var users []AdminUser
+	err := c.do(ctx, http.MethodGet, "/admin/users", token, nil, &users)
+	return users, err
+}
+
+func (c *Client) CreateUser(ctx context.Context, token, email, password, role string) (AdminUser, error) {
+	var user AdminUser
+	err := c.do(ctx, http.MethodPost, "/admin/users", token, adminCreateUserRequest{Email: email, Password: password, Role: role}, &user)
+	return user, err
+}
+
+func (c *Client) UpdateUser(ctx context.Context, token string, id int64, role, status string) (AdminUser, error) {
+	var user AdminUser
+	path := "/admin/users/" + strconv.FormatInt(id, 10)
+	err := c.do(ctx, http.MethodPatch, path, token, adminUpdateUserRequest{Role: role, Status: status}, &user)
+	return user, err
+}
+
+func (c *Client) DeleteUser(ctx context.Context, token string, id int64) error {
+	path := "/admin/users/" + strconv.FormatInt(id, 10)
+	return c.do(ctx, http.MethodDelete, path, token, nil, nil)
 }

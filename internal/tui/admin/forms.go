@@ -56,6 +56,7 @@ func newHomeForm() *huh.Form {
 				huh.NewOption("Créer un produit", "create_product"),
 				huh.NewOption("Commandes", "orders"),
 				huh.NewOption("Créer une commande pour un client", "create_order"),
+				huh.NewOption("Utilisateurs", "users"),
 				huh.NewOption("Se déconnecter", "logout"),
 				huh.NewOption("Quitter", "quit"),
 			),
@@ -110,6 +111,48 @@ func newCreateOrderForm(products []apiclient.Product) *huh.Form {
 					return nil
 				}),
 			huh.NewInput().Key("quantity").Title("Quantité par produit").Placeholder("1").Validate(validateQuantity),
+		),
+	)
+}
+
+func validatePassword(s string) error {
+	if len(s) < 8 || len(s) > 72 {
+		return errors.New("8 à 72 caractères")
+	}
+	return nil
+}
+
+func newCreateUserForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("email").Title("Email").Validate(required),
+			huh.NewInput().Key("password").Title("Mot de passe initial").EchoMode(huh.EchoModePassword).Validate(validatePassword),
+			huh.NewSelect[string]().Key("role").Title("Rôle").Options(
+				huh.NewOption("Client", "user"),
+				huh.NewOption("Admin", "admin"),
+			),
+		),
+	)
+}
+
+func newUserActionForm(users []apiclient.AdminUser) *huh.Form {
+	opts := make([]huh.Option[string], 0, len(users))
+	for _, user := range users {
+		label := fmt.Sprintf("#%d %s (%s, %s)", user.ID, user.Email, roleLabel(user.Role), userStatusLabel(user.Status))
+		opts = append(opts, huh.NewOption(label, strconv.FormatInt(user.ID, 10)))
+	}
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Key("user").Title("Utilisateur").Options(opts...),
+			huh.NewSelect[string]().Key("action").Title("Action").Options(
+				huh.NewOption("Confirmer le compte", "confirm"),
+				huh.NewOption("Réactiver", "enable"),
+				huh.NewOption("Désactiver", "disable"),
+				huh.NewOption("Passer admin", "role_admin"),
+				huh.NewOption("Passer client", "role_user"),
+				huh.NewOption("Supprimer", "delete"),
+			),
+			huh.NewConfirm().Key("ok").Title("Confirmer l'action ?"),
 		),
 	)
 }

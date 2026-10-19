@@ -20,6 +20,9 @@ const (
 	screenOrders
 	screenChangeStatus
 	screenCreateOrder
+	screenUsers
+	screenCreateUser
+	screenUserAction
 )
 
 type Model struct {
@@ -34,6 +37,7 @@ type Model struct {
 	spinner  spinner.Model
 	orders   []apiclient.Order
 	products []apiclient.Product
+	users    []apiclient.AdminUser
 }
 
 func New(api *apiclient.Client) Model {
@@ -83,6 +87,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenOrders
 			return m, nil
 		}
+		if (m.screen == screenCreateUser || m.screen == screenUserAction) && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenUsers
+			return m, nil
+		}
 		if m.screen == screenOrders {
 			switch msg.String() {
 			case "s":
@@ -97,6 +106,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "r":
 				m.info = ""
 				return m.startLoading(listAllOrdersCmd(m.api, m.token))
+			case "esc", "q":
+				m.err = ""
+				m.info = ""
+				return m.goHome()
+			}
+			return m, nil
+		}
+		if m.screen == screenUsers {
+			switch msg.String() {
+			case "c":
+				m.err = ""
+				m.info = ""
+				m.screen = screenCreateUser
+				m.form = newCreateUserForm()
+				return m, m.form.Init()
+			case "a":
+				if len(m.users) == 0 {
+					return m, nil
+				}
+				m.err = ""
+				m.info = ""
+				m.screen = screenUserAction
+				m.form = newUserActionForm(m.users)
+				return m, m.form.Init()
+			case "r":
+				m.info = ""
+				return m.startLoading(listUsersCmd(m.api, m.token))
 			case "esc", "q":
 				m.err = ""
 				m.info = ""
@@ -124,6 +160,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.token = ""
 		m.orders = nil
 		m.products = nil
+		m.users = nil
 		m.info = "Tu es déconnecté."
 		m.screen = screenLogin
 		m.form = newLoginForm()
@@ -188,6 +225,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = ""
 		m.info = fmt.Sprintf("Commande %s créée pour %s (en attente)", msg.order.ID, msg.order.UserEmail)
 		return m.goHome()
+
+	case usersResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			return m.goHome()
+		}
+		m.err = ""
+		m.users = msg.users
+		m.screen = screenUsers
+		return m, nil
+
+	case userActionMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.info = ""
+			m.screen = screenUsers
+			return m.startLoading(listUsersCmd(m.api, m.token))
+		}
+		m.err = ""
+		m.info = msg.info
+		return m.startLoading(listUsersCmd(m.api, m.token))
 	}
 
 	if m.loading {
@@ -219,6 +279,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.startLoading(listAllOrdersCmd(m.api, m.token))
 		case "create_order":
 			return m.startLoading(loadProductsCmd(m.api))
+		case "users":
+			return m.startLoading(listUsersCmd(m.api, m.token))
 		case "logout":
 			return m.startLoading(logoutCmd(m.api, m.token))
 		case "quit":
@@ -239,6 +301,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ids, _ := m.form.Get("products").([]string)
 		qty, _ := strconv.Atoi(m.form.GetString("quantity"))
 		return m.startLoading(createOrderCmd(m.api, m.token, m.form.GetString("email"), ids, qty))
+
+	case screenCreateUser:
+		return m.startLoading(createUserCmd(m.api, m.token,
+			m.form.GetString("email"), m.form.GetString("password"), m.form.GetString("role")))
+
+	case screenUserAction:
+		if !m.form.GetBool("ok") {
+			m.screen = screenUsers
+			return m, nil
+		}
+		return m.startLoading(userActionCmd(m.api, m.token, m.form.GetString("user"), m.form.GetString("action")))
 	}
 
 	return m, cmd
@@ -257,10 +330,13 @@ func (m Model) View() tea.View {
 	case screenOrders:
 		s += renderOrders(m.orders)
 		help = "s changer un statut • r rafraîchir • esc retour • ctrl+c quitter"
+	case screenUsers:
+		s += renderUsers(m.users)
+		help = "c créer • a action (confirmer, rôle, désactiver, supprimer) • r rafraîchir • esc retour"
 	default:
 		s += m.form.View()
 		switch m.screen {
-		case screenCreateProduct, screenChangeStatus:
+		case screenCreateProduct, screenChangeStatus, screenCreateUser, screenUserAction:
 			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
 		case screenCreateOrder:
 			help = "↑/↓ naviguer • espace cocher • entrée valider • esc retour • ctrl+c quitter"

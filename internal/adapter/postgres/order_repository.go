@@ -82,7 +82,7 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID int64) ([]domai
 }
 
 func (r *OrderRepository) list(ctx context.Context, where string, args ...any) ([]domain.Order, error) {
-rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.db.QueryContext(ctx, `
 	SELECT o.id, o.business_id, o.user_id, u.email, o.status, o.cancel_reason, o.total_ttc, o.created_at
 	FROM orders o
 	JOIN users u ON u.id = o.user_id `+where+`

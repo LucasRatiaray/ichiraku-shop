@@ -11,4 +11,5 @@ var (
 	ErrAccountNotConfirmed = errors.New("account not confirmed")
 	ErrUnauthorized        = errors.New("unauthorized")
 	ErrConflict            = errors.New("conflict")
+	ErrSelfAction          = errors.New("action not allowed on your own account")
 )

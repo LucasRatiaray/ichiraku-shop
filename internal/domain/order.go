@@ -40,7 +40,7 @@ type Order struct {
 	TotalTTC     int64
 	Items        []OrderItem
 	CreatedAt    time.Time
-	UserEmail 	 string
+	UserEmail    string
 }
 
 func NewOrderFromBasket(b Basket, status OrderStatus) (Order, error) {

@@ -32,3 +32,35 @@ func renderOrders(orders []apiclient.Order) string {
 	}
 	return s.String()
 }
+
+var userStatusLabels = map[string]string{
+	"pending":  "non confirmé",
+	"active":   "actif",
+	"disabled": "désactivé",
+}
+
+func userStatusLabel(s string) string {
+	if l, ok := userStatusLabels[s]; ok {
+		return l
+	}
+	return s
+}
+
+func roleLabel(r string) string {
+	if r == "admin" {
+		return "admin"
+	}
+	return "client"
+}
+
+func renderUsers(users []apiclient.AdminUser) string {
+	var s strings.Builder
+	for _, user := range users {
+		status := ui.InfoStyle.Render(userStatusLabel(user.Status))
+		if user.Status != "active" {
+			status = ui.ErrStyle.Render(userStatusLabel(user.Status))
+		}
+		fmt.Fprintf(&s, "#%-4d %s  %s  %s\n", user.ID, ui.NameStyle.Render(user.Email), roleLabel(user.Role), status)
+	}
+	return s.String()
+}
