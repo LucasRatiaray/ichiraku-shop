@@ -1,8 +1,6 @@
 package client
 
 import (
-	"context"
-
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
@@ -21,14 +19,15 @@ const (
 )
 
 type Model struct {
-	api     *apiclient.Client
-	form    *huh.Form
-	screen  screen
-	loading bool
-	token   string
-	email   string
-	err     string
-	info    string
+	api      *apiclient.Client
+	form     *huh.Form
+	screen   screen
+	loading  bool
+	token    string
+	email    string
+	err      string
+	info     string
+	quitting bool
 }
 
 func New(api *apiclient.Client) Model {
@@ -58,10 +57,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.form.Init()
 		}
 		m.token = msg.token
-		m.screen = screenHome
 		m.err = ""
 		m.info = ""
-		return m, nil
+		m.screen = screenHome
+		m.form = newHomeForm()
+		return m, m.form.Init()
 
 	case registerResultMsg:
 		m.loading = false
@@ -113,9 +113,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenLogin
 		m.form = newLoginForm()
 		return m, m.form.Init()
+
+	case logoutResultMsg:
+		if m.quitting {
+			return m, tea.Quit
+		}
+		m.loading = false
+		m.token = ""
+		m.err = ""
+		m.info = "Tu es déconnecté."
+		m.screen = screenMenu
+		m.form = newMenuForm()
+		return m, m.form.Init()
 	}
 
-	if m.screen == screenHome || m.loading {
+	if m.loading {
 		return m, nil
 	}
 
@@ -170,15 +182,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenReset:
 		m.loading = true
 		return m, resetCmd(m.api, m.email, m.form.GetString("code"), m.form.GetString("password"))
+
+	case screenHome:
+		m.err = ""
+		m.info = ""
+		switch m.form.GetString("choice") {
+		case "logout":
+			m.loading = true
+			return m, logoutCmd(m.api, m.token)
+		case "quit":
+			m.quitting = true
+			m.loading = true
+			return m, logoutCmd(m.api, m.token)
+		case "catalog", "cart":
+			m.info = "Bientôt disponible."
+			m.form = newHomeForm()
+			return m, m.form.Init()
+		}
 	}
 
 	return m, cmd
 }
 
 func (m Model) View() tea.View {
-	if m.screen == screenHome {
-		return tea.NewView("Connecté ✓\n\nctrl+c pour quitter.\n")
-	}
 	if m.loading {
 		return tea.NewView("Chargement…\n")
 	}
@@ -191,119 +217,4 @@ func (m Model) View() tea.View {
 		s += "\n" + m.info + "\n"
 	}
 	return tea.NewView(s)
-}
-
-func newMenuForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Key("choice").
-				Title("Ichiraku Shop").
-				Options(
-					huh.NewOption("Se connecter", "login"),
-					huh.NewOption("Créer un compte", "register"),
-					huh.NewOption("Mot de passe oublié", "forgot"),
-					huh.NewOption("Quitter", "quit"),
-				),
-		),
-	)
-}
-
-func newLoginForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Key("email").Title("Email"),
-			huh.NewInput().Key("password").Title("Mot de passe").EchoMode(huh.EchoModePassword),
-		),
-	)
-}
-
-func newRegisterForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Key("email").Title("Email"),
-			huh.NewInput().Key("password").Title("Mot de passe (8 caractères min.)").EchoMode(huh.EchoModePassword),
-		),
-	)
-}
-
-func newConfirmForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Key("code").Title("Code reçu par email"),
-		),
-	)
-}
-
-func newForgotForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Key("email").Title("Email du compte"),
-		),
-	)
-}
-
-func newResetForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Key("code").Title("Code reçu par email"),
-			huh.NewInput().Key("password").Title("Nouveau mot de passe (8 caractères min.)").EchoMode(huh.EchoModePassword),
-		),
-	)
-}
-
-type loginResultMsg struct {
-	token string
-	err   error
-}
-
-func loginCmd(api *apiclient.Client, email, password string) tea.Cmd {
-	return func() tea.Msg {
-		token, err := api.Login(context.Background(), email, password)
-		return loginResultMsg{token: token, err: err}
-	}
-}
-
-type registerResultMsg struct {
-	err error
-}
-
-func registerCmd(api *apiclient.Client, email, password string) tea.Cmd {
-	return func() tea.Msg {
-		err := api.Register(context.Background(), email, password)
-		return registerResultMsg{err: err}
-	}
-}
-
-type confirmResultMsg struct {
-	err error
-}
-
-func confirmCmd(api *apiclient.Client, email, code string) tea.Cmd {
-	return func() tea.Msg {
-		err := api.Confirm(context.Background(), email, code)
-		return confirmResultMsg{err: err}
-	}
-}
-
-type forgotResultMsg struct {
-	err error
-}
-
-func forgotCmd(api *apiclient.Client, email string) tea.Cmd {
-	return func() tea.Msg {
-		err := api.ForgotPassword(context.Background(), email)
-		return forgotResultMsg{err: err}
-	}
-}
-
-type resetResultMsg struct {
-	err error
-}
-
-func resetCmd(api *apiclient.Client, email, code, password string) tea.Cmd {
-	return func() tea.Msg {
-		err := api.ResetPassword(context.Background(), email, code, password)
-		return resetResultMsg{err: err}
-	}
 }
