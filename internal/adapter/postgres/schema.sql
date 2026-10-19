@@ -77,6 +77,6 @@ CREATE TABLE IF NOT EXISTS payments (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     order_id   BIGINT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
     amount     BIGINT NOT NULL CHECK (amount >= 0),
-    card_last4 TEXT NOT NULL CHECK (card_last4 ~ '^[0-9]{4}$'),
+    card_last4 TEXT NOT NULL CHECK (card_last4 ~ '^[0-9]{4}$'), # vérifie que le champ contient exactement 4 chiffres
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-var _ usecase.UserRepository = (*UserRepository)(nil)
+var _ usecase.UserRepository = (*UserRepository)(nil) // permet de vérifier que UserRepository implémente l'interface usecase.UserRepository
 
 type UserRepository struct {
 	db *sql.DB
@@ -24,7 +24,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	query := `INSERT INTO users (email, password_hash, role, status) VALUES ($1, $2, $3, $4) RETURNING id, created_at`
 
-	err := r.db.QueryRowContext(ctx, query, user.Email, user.PasswordHash, user.Role, user.Status).Scan(&user.ID, &user.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, user.Email, user.PasswordHash, user.Role, user.Status).Scan(&user.ID, &user.CreatedAt) // execute la requete, renvoie une ligne, copie les valeurs de la ligne dans les variables
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -118,7 +118,7 @@ func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 	res, err := r.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" { // code d'erreur pour violation de contrainte de clé étrangère
 			return domain.ErrConflict
 		}
 		return fmt.Errorf("delete user: %w", err)

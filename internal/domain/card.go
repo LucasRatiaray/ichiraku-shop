@@ -18,11 +18,11 @@ func NormalizeCardNumber(number string) string {
 	return strings.ReplaceAll(strings.TrimSpace(number), " ", "")
 }
 
-func luhnValid(number string) bool {
+func luhnValid(number string) bool { // algo de luhn, verifie si le numéro de carte est valide (multiplie 1 chifre sur 2, puis additionne si multiple de 10 c'est valide sinon invalide)
 	sum := 0
 	double := false
 	for i := len(number) - 1; i >= 0; i-- {
-		d := int(number[i] - '0')
+		d := int(number[i] - '0') // convertit le caractère en chiffre
 		if double {
 			d *= 2
 			if d > 9 {

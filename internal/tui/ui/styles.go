@@ -2,6 +2,7 @@ package ui
 
 import "charm.land/lipgloss/v2"
 
+// style lipgloss partagé
 var (
 	TitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF7A00"))
 	ErrStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F5F"))

@@ -36,7 +36,7 @@ type orderItemResponse struct {
 type orderResponse struct {
 	ID           string              `json:"id"`
 	Status       string              `json:"status"`
-	CancelReason string              `json:"cancel_reason,omitempty"`
+	CancelReason string              `json:"cancel_reason,omitempty"` // omitempty permet de ne pas inclure le champ si il est vide
 	TotalTTC     int64               `json:"total_ttc"`
 	Items        []orderItemResponse `json:"items"`
 	CreatedAt    time.Time           `json:"created_at"`
@@ -66,7 +66,7 @@ func toOrderResponse(o domain.Order) orderResponse {
 }
 
 func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
-	user, _ := userFromContext(r.Context())
+	user, _ := userFromContext(r.Context()) // ignore le bool, la route est protégée par le middleware d'authentification, donc l'utilisateur est forcément présent
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var req checkoutRequest

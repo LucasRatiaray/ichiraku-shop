@@ -50,6 +50,7 @@ func (r *ProductRepository) FindByBusinessID(ctx context.Context, businessID str
 	return p, nil
 }
 
+// requete dynamique paramétrée pour rechercher les produit selon les filtres
 func (r *ProductRepository) Search(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error) {
 	var conds []string
 	var args []any
@@ -90,7 +91,7 @@ func (r *ProductRepository) Search(ctx context.Context, f domain.ProductFilter) 
 	if err != nil {
 		return nil, fmt.Errorf("search products: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() // rend la connexion a la base apres lecture des lignes
 
 	var products []domain.Product
 	for rows.Next() {

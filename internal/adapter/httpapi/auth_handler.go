@@ -59,7 +59,7 @@ type resetPasswordRequest struct {
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter l'épuisement de la mémoire.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Limite le corps de la requête à 1 Mo : pour éviter que le client sature le serveur
 
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

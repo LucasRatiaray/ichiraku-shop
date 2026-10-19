@@ -73,6 +73,7 @@ var (
 	ErrCancelReasonRequired = errors.New("cancel reason is required")
 )
 
+// listes les transitions de statut autorisées 
 var transitions = map[OrderStatus][]OrderStatus{
 	OrderPending:   {OrderPaid, OrderCancelled},
 	OrderPaid:      {OrderShipping, OrderCancelled},

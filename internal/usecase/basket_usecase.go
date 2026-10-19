@@ -30,7 +30,7 @@ func (s *BasketService) Get(ctx context.Context, userID int64) (domain.Basket, e
 			return domain.Basket{}, fmt.Errorf("get basket: %w", err)
 		}
 
-		id, err := domain.NewBusinessID(domain.PrefixBasket)
+		id, err := domain.NewBusinessID(domain.PrefixBasket) // génère un nouvel ID unique pour le panier
 		if err != nil {
 			return domain.Basket{}, fmt.Errorf("generate basket id: %w", err)
 		}

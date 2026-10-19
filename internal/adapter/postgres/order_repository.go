@@ -22,11 +22,11 @@ func NewOrderRepository(db *sql.DB) *OrderRepository {
 }
 
 func (r *OrderRepository) CreatePaid(ctx context.Context, o *domain.Order, p *domain.Payment, basketID int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, nil) // commence une transaction pour créer la commande, le paiement et vider le panier
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() // annule la transaction si une erreur survient avant le commit
 
 	if err := insertOrder(ctx, tx, o); err != nil {
 		return err

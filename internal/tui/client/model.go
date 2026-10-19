@@ -61,13 +61,13 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) startLoading(cmd tea.Cmd) (Model, tea.Cmd) {
 	m.loading = true
-	return m, tea.Batch(cmd, m.spinner.Tick)
+	return m, tea.Batch(cmd, m.spinner.Tick) // lance le spinner et la commande en parallèle
 }
 
 func (m Model) goHome() (Model, tea.Cmd) {
 	m.screen = screenHome
 	m.form = newHomeForm()
-	return m, m.form.Init()
+	return m, m.form.Init() // réinitialise le formulaire pour l'écran d'accueil
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

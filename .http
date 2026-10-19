@@ -387,3 +387,16 @@ Authorization: Bearer <token admin>
 Content-Type: application/json
 
 {"status": "paid"}
+
+### Demo 1. Login admin
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{"email": "admin@test.fr", "password": "adminmdp123"}
+
+### Demo 2. Create demo client (active)
+POST http://localhost:8080/admin/users
+Authorization: Bearer 4917fb210ab47b665f4a43c6131f532a2eeedb69fb17794b2e0b636c6907ed10
+Content-Type: application/json
+
+{"email": "client@test.fr", "password": "client1234", "role": "user"}

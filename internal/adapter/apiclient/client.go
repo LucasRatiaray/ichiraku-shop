@@ -19,6 +19,7 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// cree un nouveau client API avec l'URL de base donnée et un client HTTP avec un délai d'attente de 10 secondes
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
@@ -40,7 +41,7 @@ func (e *APIError) Error() string {
 func (c *Client) do(ctx context.Context, method, path, token string, body, out any) error {
 	var reader io.Reader
 	if body != nil {
-		data, err := json.Marshal(body)
+		data, err := json.Marshal(body) // convertit le corps de la requête en JSON
 		if err != nil {
 			return fmt.Errorf("api: %s %s: %w", method, path, err)
 		}
