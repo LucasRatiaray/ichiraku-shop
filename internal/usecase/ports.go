@@ -43,3 +43,7 @@ type BasketRepository interface {
 	SetItem(ctx context.Context, basketID, productID int64, quantity int) error
 	RemoveItem(ctx context.Context, basketID, productID int64) error
 }
+
+type OrderRepository interface {
+	CreatePaid(ctx context.Context, o *domain.Order, p *domain.Payment, basketID int64) error
+}

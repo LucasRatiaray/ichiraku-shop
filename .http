@@ -245,3 +245,42 @@ Authorization: Bearer <token user>
 
 ### 37. No token → 401
 GET http://localhost:8080/basket
+
+### 38. Checkout with valid card → 201
+POST http://localhost:8080/orders
+Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
+
+### 39. Basket is now empty
+GET http://localhost:8080/basket
+Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
+
+### 40. Checkout with empty basket → 400
+POST http://localhost:8080/orders
+Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
+
+### 41. Bad Luhn → 400 (re-add an item first)
+POST http://localhost:8080/orders
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4241", "expiry": "12/30", "cvc": "123"}
+
+### 42. Expired → 400
+POST http://localhost:8080/orders
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "01/24", "cvc": "123"}
+
+### 43. Bad CVC → 400
+POST http://localhost:8080/orders
+Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "12"}

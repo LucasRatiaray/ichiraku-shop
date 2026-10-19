@@ -1,0 +1,90 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/usecase"
+)
+
+type OrderHandler struct {
+	orders *usecase.OrderService
+}
+
+func NewOrderHandler(orders *usecase.OrderService) *OrderHandler {
+	return &OrderHandler{orders: orders}
+}
+
+type checkoutRequest struct {
+	CardNumber string `json:"card_number"`
+	Expiry     string `json:"expiry"`
+	CVC        string `json:"cvc"`
+}
+
+type orderItemResponse struct {
+	ProductID    string `json:"product_id"`
+	Name         string `json:"name"`
+	UnitPriceTTC int64  `json:"unit_price_ttc"`
+	Quantity     int    `json:"quantity"`
+	TotalTTC     int64  `json:"total_ttc"`
+}
+
+type orderResponse struct {
+	ID           string              `json:"id"`
+	Status       string              `json:"status"`
+	CancelReason string              `json:"cancel_reason,omitempty"`
+	TotalTTC     int64               `json:"total_ttc"`
+	Items        []orderItemResponse `json:"items"`
+	CreatedAt    time.Time           `json:"created_at"`
+}
+
+func toOrderResponse(o domain.Order) orderResponse {
+	items := make([]orderItemResponse, 0, len(o.Items))
+	for _, it := range o.Items {
+		items = append(items, orderItemResponse{
+			ProductID:    it.ProductBusinessID,
+			Name:         it.Name,
+			UnitPriceTTC: it.UnitPriceTTC,
+			Quantity:     it.Quantity,
+			TotalTTC:     it.TotalTTC(),
+		})
+	}
+	return orderResponse{
+		ID:           o.BusinessID,
+		Status:       string(o.Status),
+		CancelReason: o.CancelReason,
+		TotalTTC:     o.TotalTTC,
+		Items:        items,
+		CreatedAt:    o.CreatedAt,
+	}
+}
+
+func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req checkoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	o, err := h.orders.Pay(r.Context(), user.ID, req.CardNumber, req.Expiry, req.CVC)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusCreated, toOrderResponse(o))
+	case errors.Is(err, domain.ErrInvalidCardNumber),
+		errors.Is(err, domain.ErrInvalidExpiry),
+		errors.Is(err, domain.ErrCardExpired),
+		errors.Is(err, domain.ErrInvalidCVC),
+		errors.Is(err, domain.ErrEmptyBasket):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		log.Printf("checkout: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+	}
+}

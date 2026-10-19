@@ -50,3 +50,33 @@ CREATE TABLE IF NOT EXISTS basket_items (
     quantity   INT NOT NULL CHECK (quantity > 0),
     PRIMARY KEY (basket_id, product_id)
 );
+
+CREATE TABLE IF NOT EXISTS orders (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    business_id   TEXT NOT NULL UNIQUE,
+    user_id       BIGINT NOT NULL REFERENCES users(id),
+    status        TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'shipping', 'delivered', 'cancelled')),
+    cancel_reason TEXT NOT NULL DEFAULT '',
+    total_ttc     BIGINT NOT NULL CHECK (total_ttc >= 0),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS orders_user_id_idx ON orders (user_id);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    order_id            BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id          BIGINT NOT NULL REFERENCES products(id),
+    product_business_id TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    unit_price_ttc      BIGINT NOT NULL CHECK (unit_price_ttc >= 0),
+    quantity            INT NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (order_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id   BIGINT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+    amount     BIGINT NOT NULL CHECK (amount >= 0),
+    card_last4 TEXT NOT NULL CHECK (card_last4 ~ '^[0-9]{4}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

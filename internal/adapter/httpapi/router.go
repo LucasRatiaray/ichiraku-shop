@@ -2,7 +2,7 @@ package httpapi
 
 import "net/http"
 
-func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandler) http.Handler {
+func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandler, orders *OrderHandler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +31,8 @@ func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandl
 	mux.HandleFunc("POST /basket/items", auth.RequireAuth(baskets.AddItem))
 	mux.HandleFunc("PUT /basket/items/{productID}", auth.RequireAuth(baskets.SetQuantity))
 	mux.HandleFunc("DELETE /basket/items/{productID}", auth.RequireAuth(baskets.RemoveItem))
+
+	mux.HandleFunc("POST /orders", auth.RequireAuth(orders.Checkout))
 
 	return mux
 }
