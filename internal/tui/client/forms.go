@@ -1,8 +1,10 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
@@ -147,4 +149,21 @@ func newEditBasketForm(items []apiclient.BasketItem) *huh.Form {
 			huh.NewInput().Key("quantity").Title("Nouvelle quantité (0 = supprimer)").Validate(validateQuantity(0)),
 		),
 	)
+}
+
+func newPaymentForm(total int64) *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("card_number").Title("Numéro de carte").Placeholder("4242 4242 4242 4242").Validate(required),
+			huh.NewInput().Key("expiry").Title("Expiration").Placeholder("MM/AA").Validate(required),
+			huh.NewInput().Key("cvc").Title("CVC").EchoMode(huh.EchoModePassword).Validate(required),
+		).Title("Paiement — " + ui.FormatEuros(total) + " TTC"),
+	)
+}
+
+func required(s string) error {
+	if strings.TrimSpace(s) == "" {
+		return errors.New("champ obligatoire")
+	}
+	return nil
 }

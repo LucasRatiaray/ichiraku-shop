@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"strconv"
 
 	"charm.land/bubbles/v2/spinner"
@@ -25,6 +26,7 @@ const (
 	screenAddToBasket
 	screenBasket
 	screenEditBasket
+	screenPayment
 )
 
 type Model struct {
@@ -89,7 +91,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenResults
 			return m, nil
 		}
-		if m.screen == screenEditBasket && msg.String() == "esc" {
+		if (m.screen == screenEditBasket || m.screen == screenPayment) && msg.String() == "esc" {
 			m.err = ""
 			m.screen = screenBasket
 			return m, nil
@@ -115,6 +117,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.screen == screenBasket {
 			switch msg.String() {
+			case "p":
+				if len(m.basket.Items) == 0 {
+					m.err = "Ton panier est vide."
+					return m, nil
+				}
+				m.err = ""
+				m.info = ""
+				m.screen = screenPayment
+				m.form = newPaymentForm(m.basket.TotalTTC)
+				return m, m.form.Init()
 			case "m":
 				if len(m.basket.Items) == 0 {
 					return m, nil
@@ -200,6 +212,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = false
 		m.token = ""
+		m.basket = apiclient.Basket{}
+		m.products = nil
 		m.err = ""
 		m.info = "Tu es déconnecté."
 		m.screen = screenMenu
@@ -237,6 +251,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.basket = msg.basket
 		m.screen = screenBasket
 		return m, nil
+
+	case orderResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newPaymentForm(m.basket.TotalTTC)
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.basket = apiclient.Basket{}
+		m.info = fmt.Sprintf("Commande %s payée — %s TTC", msg.order.ID, ui.FormatEuros(msg.order.TotalTTC))
+		return m.goHome()
 	}
 
 	if m.loading {
@@ -319,6 +345,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		qty, _ := strconv.Atoi(m.form.GetString("quantity"))
 		m.info = "Panier mis à jour."
 		return m.startLoading(setBasketQuantityCmd(m.api, m.token, m.form.GetString("product"), qty))
+
+	case screenPayment:
+		return m.startLoading(checkoutCmd(m.api, m.token,
+			m.form.GetString("card_number"), m.form.GetString("expiry"), m.form.GetString("cvc")))
 	}
 
 	return m, cmd
@@ -339,10 +369,11 @@ func (m Model) View() tea.View {
 		help = "a ajouter au panier • n nouvelle recherche • esc retour • ctrl+c quitter"
 	case screenBasket:
 		s += renderBasket(m.basket)
-		help = "m modifier une quantité • esc retour • ctrl+c quitter"
+		help = "p payer • m modifier une quantité • esc retour • ctrl+c quitter"
 	default:
 		s += m.form.View()
-		if m.screen == screenSearch || m.screen == screenAddToBasket || m.screen == screenEditBasket {
+		switch m.screen {
+		case screenSearch, screenAddToBasket, screenEditBasket, screenPayment:
 			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
 		}
 	}

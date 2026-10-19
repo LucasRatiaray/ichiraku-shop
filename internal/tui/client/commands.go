@@ -112,3 +112,15 @@ func setBasketQuantityCmd(api *apiclient.Client, token, productID string, quanti
 		return basketResultMsg{basket: b, err: err}
 	}
 }
+
+type orderResultMsg struct {
+	order apiclient.Order
+	err   error
+}
+
+func checkoutCmd(api *apiclient.Client, token, cardNumber, expiry, cvc string) tea.Cmd {
+	return func() tea.Msg {
+		o, err := api.Checkout(context.Background(), token, cardNumber, expiry, cvc)
+		return orderResultMsg{order: o, err: err}
+	}
+}

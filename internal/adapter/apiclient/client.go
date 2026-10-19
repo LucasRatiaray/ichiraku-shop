@@ -257,3 +257,32 @@ func (c *Client) RemoveFromBasket(ctx context.Context, token, productID string) 
 	err := c.do(ctx, http.MethodDelete, "/basket/items/"+url.PathEscape(productID), token, nil, &b)
 	return b, err
 }
+
+type OrderItem struct {
+	ProductID    string `json:"product_id"`
+	Name         string `json:"name"`
+	UnitPriceTTC int64  `json:"unit_price_ttc"`
+	Quantity     int    `json:"quantity"`
+	TotalTTC     int64  `json:"total_ttc"`
+}
+
+type Order struct {
+	ID           string      `json:"id"`
+	Status       string      `json:"status"`
+	CancelReason string      `json:"cancel_reason"`
+	TotalTTC     int64       `json:"total_ttc"`
+	Items        []OrderItem `json:"items"`
+	CreatedAt    time.Time   `json:"created_at"`
+}
+
+type checkoutRequest struct {
+	CardNumber string `json:"card_number"`
+	Expiry     string `json:"expiry"`
+	CVC        string `json:"cvc"`
+}
+
+func (c *Client) Checkout(ctx context.Context, token, cardNumber, expiry, cvc string) (Order, error) {
+	var o Order
+	err := c.do(ctx, http.MethodPost, "/orders", token, checkoutRequest{CardNumber: cardNumber, Expiry: expiry, CVC: cvc}, &o)
+	return o, err
+}
