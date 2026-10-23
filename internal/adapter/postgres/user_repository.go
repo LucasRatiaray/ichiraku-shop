@@ -37,10 +37,10 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, created_at FROM users WHERE email = $1`
+	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users WHERE email = $1`
 	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -52,10 +52,10 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, created_at FROM users WHERE id = $1`
+	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users WHERE id = $1`
 	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -89,8 +89,25 @@ func (r *UserRepository) Update(ctx context.Context, user domain.User) error {
 	return nil
 }
 
+func (r *UserRepository) IncrementTokenVersion(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE users SET token_version = token_version + 1 WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("increment token version: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("increment token version: %w", err)
+	}
+	if rows == 0 {
+		return domain.ErrNotFound
+	}
+
+	return nil
+}
+
 func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, created_at FROM users ORDER BY id`
+	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users ORDER BY id`
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -101,7 +118,7 @@ func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
 	var users []domain.User
 	for rows.Next() {
 		var user domain.User
-		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt); err != nil {
 			return nil, fmt.Errorf("list users: %w", err)
 		}
 		users = append(users, user)

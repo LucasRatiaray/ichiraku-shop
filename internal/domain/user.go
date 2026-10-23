@@ -23,5 +23,6 @@ type User struct {
 	PasswordHash string
 	Role         Role
 	Status       Status
+	TokenVersion int
 	CreatedAt    time.Time
 }

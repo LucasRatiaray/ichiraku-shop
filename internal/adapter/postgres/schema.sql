@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'disabled')),
+    token_version INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -16,14 +17,6 @@ CREATE TABLE IF NOT EXISTS verification_codes (
     used_at TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL UNIQUE,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS products (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     business_id TEXT NOT NULL UNIQUE,
@@ -34,8 +27,6 @@ CREATE TABLE IF NOT EXISTS products (
     vat_rate BIGINT NOT NULL DEFAULT 2000,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-ALTER TABLE products ADD COLUMN IF NOT EXISTS vat_rate BIGINT NOT NULL DEFAULT 2000;
 
 CREATE TABLE IF NOT EXISTS baskets (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
