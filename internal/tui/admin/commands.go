@@ -29,7 +29,6 @@ func loginCmd(api *apiclient.Client, email, password string) tea.Cmd {
 			return loginResultMsg{err: err}
 		}
 		if u.Role != "admin" {
-			_ = api.Logout(ctx, token)
 			return loginResultMsg{err: errNotAdmin}
 		}
 		return loginResultMsg{token: token}
