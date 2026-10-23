@@ -43,7 +43,21 @@ func main() {
 
 	userRepo := postgres.NewUserRepository(db)
 	codeRepo := postgres.NewVerificationCodeRepository(db)
-	mail := mailer.NewLogMailer()
+	var mail usecase.Mailer = mailer.NewLogMailer()
+	if host := os.Getenv("MAIL_HOST"); host != "" {
+		port := os.Getenv("MAIL_PORT")
+		if port == "" {
+			port = "25"
+		}
+		from := os.Getenv("MAIL_FROM")
+		if from == "" {
+			from = "no-reply@ichiraku.shop"
+		}
+		mail = mailer.NewSMTPMailer(host, port, from, os.Getenv("MAIL_USERNAME"), os.Getenv("MAIL_PASSWORD"))
+		log.Printf("Mailer: SMTP %s:%s", host, port)
+	} else {
+		log.Println("Mailer: log (MAIL_HOST not set)")
+	}
 	sessionRepo := postgres.NewSessionRepository(db)
 
 	authService := usecase.NewAuthService(userRepo, codeRepo, mail, sessionRepo)

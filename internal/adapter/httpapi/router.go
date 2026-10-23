@@ -13,6 +13,8 @@ func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandl
 
 	mux.HandleFunc("POST /auth/confirm", auth.Confirm)
 
+	mux.HandleFunc("POST /auth/confirm/resend", auth.ResendConfirmation)
+
 	mux.HandleFunc("POST /auth/login", auth.Login)
 
 	mux.HandleFunc("GET /auth/me", auth.RequireAuth(auth.Me))

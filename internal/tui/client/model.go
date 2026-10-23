@@ -19,6 +19,7 @@ const (
 	screenLogin
 	screenRegister
 	screenConfirm
+	screenResend
 	screenForgot
 	screenReset
 	screenSearch
@@ -102,6 +103,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = ""
 			m.screen = screenBasket
 			return m, nil
+		}
+		if !m.loading && msg.String() == "esc" {
+			switch m.screen {
+			case screenLogin, screenRegister, screenConfirm, screenResend, screenForgot, screenReset:
+				m.err = ""
+				m.info = ""
+				m.screen = screenMenu
+				m.form = newMenuForm()
+				return m, m.form.Init()
+			case screenBasket, screenOrders:
+				m.err = ""
+				m.info = ""
+				m.screen = screenResults
+				return m, nil
+			}
 		}
 		if !m.loading && (m.screen == screenResults || m.screen == screenBasket || m.screen == screenOrders) {
 			switch msg.String() {
@@ -200,6 +216,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.info = "Compte confirmé, tu peux te connecter."
 		m.screen = screenLogin
 		m.form = newLoginForm()
+		return m, m.form.Init()
+
+	case resendResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newForgotForm()
+			return m, m.form.Init()
+		}
+		m.err = ""
+		m.info = "Si ce compte attend une confirmation, un nouveau code a été envoyé."
+		m.screen = screenConfirm
+		m.form = newConfirmForm()
 		return m, m.form.Init()
 
 	case forgotResultMsg:
@@ -332,6 +361,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenRegister
 			m.form = newRegisterForm()
 			return m, m.form.Init()
+		case "resend":
+			m.screen = screenResend
+			m.form = newForgotForm()
+			return m, m.form.Init()
 		case "forgot":
 			m.screen = screenForgot
 			m.form = newForgotForm()
@@ -349,6 +382,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case screenConfirm:
 		return m.startLoading(confirmCmd(m.api, m.email, m.form.GetString("code")))
+
+	case screenResend:
+		m.email = m.form.GetString("email")
+		return m.startLoading(resendCmd(m.api, m.email))
 
 	case screenForgot:
 		m.email = m.form.GetString("email")
@@ -388,6 +425,8 @@ func (s screen) title() string {
 		return "Créer un compte"
 	case screenConfirm:
 		return "Confirmation du compte"
+	case screenResend:
+		return "Renvoyer le code"
 	case screenForgot:
 		return "Mot de passe oublié"
 	case screenReset:
@@ -437,10 +476,10 @@ func (m Model) View() tea.View {
 		hints = []ui.Hint{{Key: "/", Label: "rechercher"}, {Key: "a", Label: "ajouter au panier"}, quit}
 	case screenBasket:
 		s = renderBasket(m.basket, contentWidth)
-		hints = []ui.Hint{{Key: "p", Label: "payer"}, {Key: "m", Label: "modifier une quantité"}, quit}
+		hints = []ui.Hint{{Key: "p", Label: "payer"}, {Key: "m", Label: "modifier une quantité"}, {Key: "esc", Label: "retour"}, quit}
 	case screenOrders:
 		s = renderOrders(m.orders, contentWidth)
-		hints = []ui.Hint{quit}
+		hints = []ui.Hint{{Key: "esc", Label: "retour"}, quit}
 	default:
 		s = m.form.WithWidth(contentWidth).View()
 	}
@@ -459,6 +498,9 @@ func (m Model) View() tea.View {
 		return ui.Shop(m.width, m.height, m.tabs(), s, hints...)
 	}
 	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
+	if m.screen != screenMenu {
+		help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
+	}
 	if m.loading {
 		help = "ctrl+c quitter"
 	}

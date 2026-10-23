@@ -20,6 +20,7 @@ func newMenuForm() *huh.Form {
 				Options(
 					huh.NewOption("Se connecter", "login"),
 					huh.NewOption("Créer un compte", "register"),
+					huh.NewOption("Renvoyer le code de confirmation", "resend"),
 					huh.NewOption("Mot de passe oublié", "forgot"),
 					huh.NewOption("Quitter", "quit"),
 				),

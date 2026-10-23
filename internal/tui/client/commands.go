@@ -42,6 +42,17 @@ func confirmCmd(api *apiclient.Client, email, code string) tea.Cmd {
 	}
 }
 
+type resendResultMsg struct {
+	err error
+}
+
+func resendCmd(api *apiclient.Client, email string) tea.Cmd {
+	return func() tea.Msg {
+		err := api.ResendConfirmation(context.Background(), email)
+		return resendResultMsg{err: err}
+	}
+}
+
 type forgotResultMsg struct {
 	err error
 }

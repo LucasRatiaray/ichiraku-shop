@@ -36,8 +36,8 @@ func (s *UserAdminService) Create(ctx context.Context, email, password, role str
 	if err != nil || addr.Address != email {
 		return domain.User{}, domain.ErrInvalidInput
 	}
-	if len(password) < 8 || len(password) > 72 {
-		return domain.User{}, domain.ErrInvalidInput
+	if err := validatePassword(password); err != nil {
+		return domain.User{}, err
 	}
 	r := domain.Role(role)
 	if !validRole(r) {
@@ -71,8 +71,8 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, email,
 		user.Email = email
 	}
 	if password != "" {
-		if len(password) < 8 || len(password) > 72 {
-			return domain.User{}, domain.ErrInvalidInput
+		if err := validatePassword(password); err != nil {
+			return domain.User{}, err
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {

@@ -104,6 +104,11 @@ func (c *Client) Confirm(ctx context.Context, email, code string) error {
 	return c.do(ctx, http.MethodPost, "/auth/confirm", "", body, nil)
 }
 
+func (c *Client) ResendConfirmation(ctx context.Context, email string) error {
+	body := map[string]string{"email": email}
+	return c.do(ctx, http.MethodPost, "/auth/confirm/resend", "", body, nil)
+}
+
 func (c *Client) Login(ctx context.Context, email, password string) (string, error) {
 	body := map[string]string{
 		"email":    email,

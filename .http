@@ -450,3 +450,45 @@ Authorization: Bearer <token admin>
 Content-Type: application/json
 
 {"email": "", "password": ""}
+
+
+### ---------- MAILPIT (interface web : http://localhost:8025) ----------
+
+### M0. Liste des mails reçus par Mailpit
+GET http://localhost:8025/api/v1/messages
+
+### M1. Inscription → 201, mail "Confirme ton compte" visible dans Mailpit
+POST http://localhost:8080/auth/register
+Content-Type: application/json
+
+{"email": "mail@test.fr", "password": "motdepasse123"}
+
+### M2. Renvoi pour un compte pending → 204 + nouveau mail dans Mailpit
+POST http://localhost:8080/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "mail@test.fr"}
+
+### M3. Renvoi pour un compte inconnu → 204, aucun mail
+POST http://localhost:8080/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "inconnu@test.fr"}
+
+### M4. Renvoi pour un compte actif (admin) → 204, aucun mail
+POST http://localhost:8080/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "admin@test.fr"}
+
+### M5. JSON invalide → 400
+POST http://localhost:8080/auth/confirm/resend
+Content-Type: application/json
+
+{ "email": }
+
+### M6. Mot de passe oublié (compte actif) → 204, mail "Réinitialisation" dans Mailpit
+POST http://localhost:8080/auth/password/forgot
+Content-Type: application/json
+
+{"email": "admin@test.fr"}

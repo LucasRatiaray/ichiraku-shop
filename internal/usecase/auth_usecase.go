@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/mail"
 	"strings"
 	"time"
@@ -37,8 +38,8 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 		return domain.User{}, domain.ErrInvalidInput
 	}
 
-	if len(password) < 8 || len(password) > 72 {
-		return domain.User{}, domain.ErrInvalidInput
+	if err := validatePassword(password); err != nil {
+		return domain.User{}, err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -57,27 +58,61 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (dom
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
-	code, err := generateCode()
+	code, err := s.newCode(ctx, user.ID, domain.PurposeConfirm)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("register: %w", err)
 	}
 
-	vc := domain.VerificationCode{
-		UserID:    user.ID,
-		Code:      code,
-		Purpose:   domain.PurposeConfirm,
-		ExpiresAt: time.Now().Add(15 * time.Minute),
-	}
-
-	if err := s.codes.Create(ctx, &vc); err != nil {
-		return domain.User{}, fmt.Errorf("register: %w", err)
-	}
-
 	if err := s.mailer.SendCode(ctx, user.Email, code, domain.PurposeConfirm); err != nil {
-		return domain.User{}, fmt.Errorf("register: %w", err)
+		log.Printf("register: send confirmation code: %v", err)
 	}
 
 	return user, nil
+}
+
+func (s *AuthService) newCode(ctx context.Context, userID int64, purpose domain.CodePurpose) (string, error) {
+	code, err := generateCode()
+	if err != nil {
+		return "", err
+	}
+
+	vc := domain.VerificationCode{
+		UserID:    userID,
+		Code:      code,
+		Purpose:   purpose,
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+	}
+	if err := s.codes.Create(ctx, &vc); err != nil {
+		return "", err
+	}
+	return code, nil
+}
+
+func (s *AuthService) ResendConfirmation(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	user, err := s.users.FindByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("resend confirmation: %w", err)
+	}
+
+	if user.Status != domain.StatusPending {
+		return nil
+	}
+
+	code, err := s.newCode(ctx, user.ID, domain.PurposeConfirm)
+	if err != nil {
+		return fmt.Errorf("resend confirmation: %w", err)
+	}
+
+	if err := s.mailer.SendCode(ctx, user.Email, code, domain.PurposeConfirm); err != nil {
+		return fmt.Errorf("resend confirmation: %w", err)
+	}
+
+	return nil
 }
 
 func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
@@ -202,19 +237,8 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 		return nil
 	}
 
-	code, err := generateCode()
+	code, err := s.newCode(ctx, user.ID, domain.PurposeReset)
 	if err != nil {
-		return fmt.Errorf("request reset: %w", err)
-	}
-
-	vc := domain.VerificationCode{
-		UserID:    user.ID,
-		Code:      code,
-		Purpose:   domain.PurposeReset,
-		ExpiresAt: time.Now().Add(15 * time.Minute),
-	}
-
-	if err := s.codes.Create(ctx, &vc); err != nil {
 		return fmt.Errorf("request reset: %w", err)
 	}
 
@@ -228,8 +252,8 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	if len(newPassword) < 8 || len(newPassword) > 72 {
-		return domain.ErrInvalidInput
+	if err := validatePassword(newPassword); err != nil {
+		return err
 	}
 
 	user, err := s.users.FindByEmail(ctx, email)
@@ -291,8 +315,8 @@ func (s *AuthService) EnsureAdmin(ctx context.Context, email, password string) e
 		return fmt.Errorf("ensure admin: %w", err)
 	}
 
-	if len(password) < 8 || len(password) > 72 {
-		return domain.ErrInvalidInput
+	if err := validatePassword(password); err != nil {
+		return err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
