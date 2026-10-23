@@ -15,18 +15,18 @@ import (
 )
 
 type AuthService struct {
-	users    UserRepository
-	codes    VerificationCodeRepository
-	mailer   Mailer
-	sessions SessionRepository
+	users     UserRepository
+	codes     VerificationCodeRepository
+	mailer    Mailer
+	jwtSecret []byte
 }
 
-func NewAuthService(users UserRepository, codes VerificationCodeRepository, mailer Mailer, sessions SessionRepository) *AuthService {
+func NewAuthService(users UserRepository, codes VerificationCodeRepository, mailer Mailer, jwtSecret []byte) *AuthService {
 	return &AuthService{
-		users:    users,
-		codes:    codes,
-		mailer:   mailer,
-		sessions: sessions,
+		users:     users,
+		codes:     codes,
+		mailer:    mailer,
+		jwtSecret: jwtSecret,
 	}
 }
 
@@ -180,18 +180,8 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", domain.ErrInvalidCredentials
 	}
 
-	token, err := generateToken()
+	token, err := signToken(s.jwtSecret, user, time.Now())
 	if err != nil {
-		return "", fmt.Errorf("login: %w", err)
-	}
-
-	sess := domain.Session{
-		UserID:    user.ID,
-		TokenHash: hashToken(token),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
-
-	if err := s.sessions.Create(ctx, &sess); err != nil {
 		return "", fmt.Errorf("login: %w", err)
 	}
 
@@ -199,7 +189,12 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 }
 
 func (s *AuthService) Authenticate(ctx context.Context, token string) (domain.User, error) {
-	sess, err := s.sessions.FindValid(ctx, hashToken(token))
+	userID, version, err := parseToken(s.jwtSecret, token)
+	if err != nil {
+		return domain.User{}, domain.ErrUnauthorized
+	}
+
+	user, err := s.users.FindByID(ctx, userID)
 	if errors.Is(err, domain.ErrNotFound) {
 		return domain.User{}, domain.ErrUnauthorized
 	}
@@ -207,15 +202,7 @@ func (s *AuthService) Authenticate(ctx context.Context, token string) (domain.Us
 		return domain.User{}, fmt.Errorf("authenticate: %w", err)
 	}
 
-	user, err := s.users.FindByID(ctx, sess.UserID)
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.User{}, domain.ErrUnauthorized
-	}
-	if err != nil {
-		return domain.User{}, fmt.Errorf("authenticate: %w", err)
-	}
-
-	if user.Status != domain.StatusActive {
+	if user.Status != domain.StatusActive || user.TokenVersion != version {
 		return domain.User{}, domain.ErrUnauthorized
 	}
 
@@ -289,16 +276,15 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPasswor
 	if err := s.users.Update(ctx, user); err != nil {
 		return fmt.Errorf("reset password: %w", err)
 	}
+	if err := s.users.IncrementTokenVersion(ctx, user.ID); err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
 
 	return nil
 }
 
-func (s *AuthService) Logout(ctx context.Context, token string) error {
-	err := s.sessions.Delete(ctx, hashToken(token))
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.ErrUnauthorized
-	}
-	if err != nil {
+func (s *AuthService) Logout(ctx context.Context, userID int64) error {
+	if err := s.users.IncrementTokenVersion(ctx, userID); err != nil {
 		return fmt.Errorf("logout: %w", err)
 	}
 	return nil

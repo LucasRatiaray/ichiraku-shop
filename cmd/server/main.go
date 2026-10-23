@@ -22,6 +22,11 @@ func main() {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) < 32 {
+		log.Fatal("JWT_SECRET must be set and at least 32 characters long")
+	}
+
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
@@ -58,9 +63,8 @@ func main() {
 	} else {
 		log.Println("Mailer: log (MAIL_HOST not set)")
 	}
-	sessionRepo := postgres.NewSessionRepository(db)
 
-	authService := usecase.NewAuthService(userRepo, codeRepo, mail, sessionRepo)
+	authService := usecase.NewAuthService(userRepo, codeRepo, mail, []byte(jwtSecret))
 
 	adminEmail := os.Getenv("ADMIN_EMAIL")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")

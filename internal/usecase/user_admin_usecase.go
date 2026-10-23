@@ -103,6 +103,11 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, email,
 	if err := s.users.Update(ctx, user); err != nil {
 		return domain.User{}, err
 	}
+	if password != "" {
+		if err := s.users.IncrementTokenVersion(ctx, id); err != nil {
+			return domain.User{}, err
+		}
+	}
 	return user, nil
 }
 

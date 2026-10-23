@@ -3,17 +3,18 @@ module github.com/LucasRatiaray/ichiraku-shop
 go 1.27.0
 
 require (
+	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.0
 	charm.land/huh/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.6
 	charm.land/ssh v0.4.3
 	charm.land/wish/v2 v2.0.5
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.11.0
 	golang.org/x/crypto v0.58.0
 )
 
 require (
-	charm.land/bubbles/v2 v2.2.1 // indirect
-	charm.land/lipgloss/v2 v2.0.6 // indirect
 	charm.land/log/v2 v2.0.1 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect

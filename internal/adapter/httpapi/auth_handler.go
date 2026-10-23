@@ -221,9 +221,13 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	token, _ := bearerToken(r)
-	err := h.auth.Logout(r.Context(), token)
-	if err != nil {
+	user, ok := userFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := h.auth.Logout(r.Context(), user.ID); err != nil {
 		log.Printf("logout: %v", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return

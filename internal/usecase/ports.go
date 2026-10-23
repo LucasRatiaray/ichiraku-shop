@@ -12,6 +12,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	FindByID(ctx context.Context, id int64) (domain.User, error)
 	Update(ctx context.Context, user domain.User) error
+	IncrementTokenVersion(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]domain.User, error)
 	Delete(ctx context.Context, id int64) error
 }
@@ -24,12 +25,6 @@ type VerificationCodeRepository interface {
 
 type Mailer interface {
 	SendCode(ctx context.Context, email string, code string, purpose domain.CodePurpose) error
-}
-
-type SessionRepository interface {
-	Create(ctx context.Context, code *domain.Session) error
-	FindValid(ctx context.Context, tokenHash string) (domain.Session, error)
-	Delete(ctx context.Context, tokenHash string) error
 }
 
 type ProductRepository interface {
