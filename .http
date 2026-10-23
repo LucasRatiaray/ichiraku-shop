@@ -1,37 +1,107 @@
 @baseUrl = http://localhost:8080
-@token = bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+@mailpit = http://localhost:8025
 
-### 0. Health → 200
+@adminEmail = admin@test.fr
+@adminPassword = adminmdp123
+
+@token_admin = {{loginAdmin.response.body.$.token}}
+@token_user = {{loginClient.response.body.$.token}}
+@ramenId = {{createRamen.response.body.$.id}}
+@gyozaId = {{createGyoza.response.body.$.id}}
+@theId = {{createThe.response.body.$.id}}
+@clientId = {{createClient.response.body.$.id}}
+@orderId = {{checkout.response.body.$.id}}
+@order2Id = {{checkout2.response.body.$.id}}
+@adminOrderId = {{adminOrder.response.body.$.id}}
+@adminId = {{meAdmin.response.body.$.id}}
+
+@confirmCode = 000000
+@resetCode = 000000
+
+### =====================================================================
+### Ordre conseillé : exécuter de haut en bas sur une base vierge.
+### Les tokens et identifiants se récupèrent seuls (requêtes nommées).
+### Seuls @confirmCode et @resetCode sont à remplacer à la main, avec le
+### code reçu dans Mailpit (http://localhost:8025) ou dans les logs.
+### @adminEmail et @adminPassword doivent correspondre à ADMIN_EMAIL et
+### ADMIN_PASSWORD du fichier .env.
+### =====================================================================
+
+### 0. Santé → 200
 GET {{baseUrl}}/health
+
+### ---------- PRÉPARATION (ADMIN) ----------
+
+### P1. Login admin → 200 + token JWT (xxx.yyy.zzz)
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "{{adminEmail}}", "password": "{{adminPassword}}"}
+
+### P2. Profil admin → 200 (récupère l'id de l'admin)
+# @name meAdmin
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token_admin}}
+
+### P3. Créer un produit (admin) → 201, identifiant PDT-XXXXXX
+# @name createRamen
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"name": "Ramen Tonkotsu", "description": "Bouillon de porc 12h", "category": "ramen", "price_ht": 1250}
+
+### P4. Créer un deuxième produit → 201
+# @name createGyoza
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"name": "Gyoza", "description": "Raviolis grillés au porc", "category": "entrée", "price_ht": 650}
+
+### P5. Créer un troisième produit → 201
+# @name createThe
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"name": "Thé vert", "description": "Sencha chaud", "category": "boisson", "price_ht": 300}
+
+### P6. Créer un client actif (admin) → 201
+# @name createClient
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "client@test.fr", "password": "client1234", "role": "user"}
+
+### P7. Login du client → 200 + token (utilisé pour le panier, le paiement et les commandes)
+# @name loginClient
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "client@test.fr", "password": "client1234"}
 
 ### ---------- INSCRIPTION ----------
 
-### 1. Inscription valide → 201
+### 1. Inscription valide → 201 (mail "Confirme ton compte" dans Mailpit)
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "password": "motdepasse123"
-}
+{"email": "lucas@test.fr", "password": "motdepasse123"}
 
 ### 2. Même email → 409
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "password": "motdepasse123"
-}
+{"email": "lucas@test.fr", "password": "motdepasse123"}
 
 ### 3. Mot de passe trop court → 400
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
-{
-  "email": "autre@test.fr",
-  "password": "abc"
-}
+{"email": "autre@test.fr", "password": "abc"}
 
 ### 4. JSON invalide → 400
 POST {{baseUrl}}/auth/register
@@ -41,49 +111,66 @@ Content-Type: application/json
 
 ### ---------- CONFIRMATION ----------
 
-### 5. Confirmation avec le code des logs → 204
+### 4b. Connexion avant confirmation → 403
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "lucas@test.fr", "password": "motdepasse123"}
+
+### 4c. Renvoi du code pour un compte pending → 204 + nouveau mail dans Mailpit
+POST {{baseUrl}}/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "lucas@test.fr"}
+
+### 4d. Renvoi pour un compte inconnu → 204, aucun mail
+POST {{baseUrl}}/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "inconnu@test.fr"}
+
+### 4e. Renvoi pour un compte actif → 204, aucun mail
+POST {{baseUrl}}/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "{{adminEmail}}"}
+
+### 4f. Renvoi avec un JSON invalide → 400
+POST {{baseUrl}}/auth/confirm/resend
+Content-Type: application/json
+
+{ "email": }
+
+### 5. Confirmation avec le code reçu → 204 (remplacer @confirmCode en haut du fichier)
 POST {{baseUrl}}/auth/confirm
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "code": "568277"
-}
+{"email": "lucas@test.fr", "code": "{{confirmCode}}"}
 
 ### 6. Code faux → 400
 POST {{baseUrl}}/auth/confirm
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "code": "000000"
-}
+{"email": "lucas@test.fr", "code": "000000"}
 
-### ---------- CONNEXION ----------
+### ---------- CONNEXION ET JWT ----------
 
-### 7. Connexion → 200 + token
+### 7. Connexion → 200 + token au format xxx.yyy.zzz
+# @name loginLucas
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "password": "motdepasse123"
-}
+{"email": "lucas@test.fr", "password": "motdepasse123"}
 
 ### 8. Mauvais mot de passe → 401
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "password": "mauvais123"
-}
-
-### ---------- ROUTE PROTÉGÉE ----------
+{"email": "lucas@test.fr", "password": "mauvais123"}
 
 ### 9. Profil avec token → 200
 GET {{baseUrl}}/auth/me
-Authorization: Bearer {{token}}
+Authorization: Bearer {{loginLucas.response.body.$.token}}
 
 ### 10. Sans token → 401
 GET {{baseUrl}}/auth/me
@@ -92,403 +179,523 @@ GET {{baseUrl}}/auth/me
 GET {{baseUrl}}/auth/me
 Authorization: Bearer nimportequoi
 
+### 11b. Token falsifié (un caractère ajouté à la signature) → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginLucas.response.body.$.token}}x
+
+### 11c. Token signé avec un autre secret (sub 1, role admin, exp en 2100) → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9.0M99TeAE45nk73hr5CC6I2b6Xru0K_DUH6a4_Plm68k
+
 ### ---------- MOT DE PASSE OUBLIÉ ----------
 
-### 12. Mot de passe oublié → 204 + code reset dans les logs
+### 12. Mot de passe oublié → 204 + mail "Réinitialisation" dans Mailpit
 POST {{baseUrl}}/auth/password/forgot
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr"
-}
+{"email": "lucas@test.fr"}
 
-### 13. Email inconnu → 204, aucun code dans les logs
+### 13. Email inconnu → 204, aucun mail
 POST {{baseUrl}}/auth/password/forgot
 Content-Type: application/json
 
-{
-  "email": "inconnu@test.fr"
-}
+{"email": "inconnu@test.fr"}
 
-### 14. Reset avec le code des logs → 204
+### 14. Reset avec le code reçu → 204 (remplacer @resetCode en haut du fichier)
 POST {{baseUrl}}/auth/password/reset
 Content-Type: application/json
 
-{
-  "email": "lucas@test.fr",
-  "code": "559844",
-  "new_password": "nouveaumdp123"
-}
+{"email": "lucas@test.fr", "code": "{{resetCode}}", "new_password": "nouveaumdp123"}
 
-### 15. Login ancien mot de passe → 401
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "lucas@test.fr",
-  "password": "motdepasse123"
-}
-
-### 16. Login nouveau mot de passe → 200 + token
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "lucas@test.fr",
-  "password": "nouveaumdp123"
-}
-
-### ---------- DÉCONNEXION ----------
-
-### 17. Logout → 204
-POST {{baseUrl}}/auth/logout
-Authorization: Bearer {{token}}
-
-### 18. Me avec le token déconnecté → 401
+### 14b. Ancien token de Lucas (émis au point 7, avant le reset) → 401
 GET {{baseUrl}}/auth/me
-Authorization: Bearer {{token}}
+Authorization: Bearer {{loginLucas.response.body.$.token}}
 
-### ---------- ADMIN ----------
-
-### 19. Login admin
-POST http://localhost:8080/auth/login
+### 15. Login avec l'ancien mot de passe → 401
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"email": "admin@test.fr", "password": "adminmdp123"}
+{"email": "lucas@test.fr", "password": "motdepasse123"}
 
-### 20. Create product (admin) → 201
-POST http://localhost:8080/admin/products
-Authorization: Bearer 
+### 16. Login avec le nouveau mot de passe → 200 + token
+# @name loginLucasNew
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"name": "Ramen Tonkotsu", "description": "Bouillon de porc 12h", "category": "ramen", "price_ht": 1250}
+{"email": "lucas@test.fr", "password": "nouveaumdp123"}
 
-### 21. Create product (user token) → 403
-POST http://localhost:8080/admin/products
-Authorization: Bearer e9f55099fefbe8cbfe5c6239689803a1179f52bd3c2f54660c8bc4caed8b748a
+### ---------- DÉCONNEXION ET RÉVOCATION ----------
+### Le logout incrémente la version du compte: tous ses tokens sont révoqués.
+
+### 17a. Premier login du compte → token A
+# @name loginTestA
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"name": "Test", "category": "ramen", "price_ht": 100}
+{"email": "lucas@test.fr", "password": "nouveaumdp123"}
 
-### 22. Create product invalid → 400
-POST http://localhost:8080/admin/products
-Authorization: Bearer 06ed2d09acaf3ea3775bb736c71ce222a3250901a617d77c1d5ac0d5397a2ff0
+### 17b. Deuxième login, attendre 1 seconde après le précédent → token B différent
+# @name loginTestB
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"name": "", "category": "ramen", "price_ht": 0}
+{"email": "lucas@test.fr", "password": "nouveaumdp123"}
 
-### ---------- PRODUCTS ----------
+### 17c. Logout avec le token A → 204
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{loginTestA.response.body.$.token}}
 
-### 23. All products
-GET http://localhost:8080/products
+### 18. Token A après le logout → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginTestA.response.body.$.token}}
 
-### 24. Search by name/description
-GET http://localhost:8080/products?q=porc
+### 18b. Token B (autre login du même compte) → 401 aussi
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginTestB.response.body.$.token}}
 
-### 25. Category + TTC range
-GET http://localhost:8080/products?category=ramen&min_ttc=1000&max_ttc=2000
+### 18c. Logout sans token → 401
+POST {{baseUrl}}/auth/logout
 
-### 26. HT range
-GET http://localhost:8080/products?max_price=500
-
-### 27. Invalid number → 400
-GET http://localhost:8080/products?min_ttc=abc
-
-### 28. Invalid range → 400
-GET http://localhost:8080/products?min_ttc=2000&max_ttc=1000
-
-### 29. No result → []
-GET http://localhost:8080/products?q=pizza
-
-### 30. Basket (created on first call)
-GET http://localhost:8080/basket
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
-
-### 31. Add item
-POST http://localhost:8080/basket/items
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+### 18d. Nouveau login après la révocation → 200
+# @name loginTestC
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"product_id": "PDT-5OUSVT", "quantity": 1}
+{"email": "lucas@test.fr", "password": "nouveaumdp123"}
 
-### 32. Add same item again → quantity 3
-POST http://localhost:8080/basket/items
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
+### 18e. /auth/me avec ce nouveau token → 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginTestC.response.body.$.token}}
+
+### ---------- DÉSACTIVATION PAR L'ADMIN ----------
+
+### 19a. Admin désactive le client → 200
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"product_id": "PDT-5OUSVT", "quantity": 1}
+{"status": "disabled"}
 
-### 33. Set quantity → 5
-PUT http://localhost:8080/basket/items/PDT-XXXXXX
-Authorization: Bearer <token user>
+### 19b. Token du client (encore valide côté signature) → 401 immédiat
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token_user}}
+
+### 19c. Login d'un compte désactivé → 401
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"quantity": 5}
+{"email": "client@test.fr", "password": "client1234"}
 
-### 34. Unknown product → 404
-POST http://localhost:8080/basket/items
-Authorization: Bearer <token user>
+### 19d. Admin réactive le client → 200, son token refonctionne
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"product_id": "PDT-000000", "quantity": 1}
+{"status": "active"}
 
-### 35. Quantity 0 on add → 400
-POST http://localhost:8080/basket/items
-Authorization: Bearer <token user>
-Content-Type: application/json
-
-{"product_id": "PDT-XXXXXX", "quantity": 0}
-
-### 36. Remove item
-DELETE http://localhost:8080/basket/items/PDT-XXXXXX
-Authorization: Bearer <token user>
-
-### 37. No token → 401
-GET http://localhost:8080/basket
-
-### 38. Checkout with valid card → 201
-POST http://localhost:8080/orders
-Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
-Content-Type: application/json
-
-{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
-
-### 39. Basket is now empty
-GET http://localhost:8080/basket
-Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
-
-### 40. Checkout with empty basket → 400
-POST http://localhost:8080/orders
-Authorization: Bearer cc7f79c9be54ebb2803ddf180e41ff50eb32ee9301f62cad3543473caa5a7b57
-Content-Type: application/json
-
-{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
-
-### 41. Bad Luhn → 400 (re-add an item first)
-POST http://localhost:8080/orders
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
-Content-Type: application/json
-
-{"card_number": "4242 4242 4242 4241", "expiry": "12/30", "cvc": "123"}
-
-### 42. Expired → 400
-POST http://localhost:8080/orders
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
-Content-Type: application/json
-
-{"card_number": "4242 4242 4242 4242", "expiry": "01/24", "cvc": "123"}
-
-### 43. Bad CVC → 400
-POST http://localhost:8080/orders
-Authorization: Bearer bf18a1d4d9b51c123558bf6c25042314469ae1e1d2d31654d649ada08de906ab
-Content-Type: application/json
-
-{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "12"}
-
-### 44. My orders
-GET http://localhost:8080/orders
-Authorization: Bearer ac2b36276f4953f4ab9f760f55ea47a755e75a16b1c25daacc498502f05b0f41
-
-### 45. Other user → only their orders (or [])
-GET http://localhost:8080/orders
-Authorization: Bearer ac2b36276f4953f4ab9f760f55ea47a755e75a16b1c25daacc498502f05b0f41
-
-### 46. No token → 401
-GET http://localhost:8080/orders
-
-### 47. Admin: all orders
-GET http://localhost:8080/admin/orders
-Authorization: Bearer 3c06995beac15385763fc706bb1f6718ab154c1e30652466df1f4934f3b82a04
-
-### 48. User on admin route → 403
-GET http://localhost:8080/admin/orders
-Authorization: Bearer <token user>
-
-### 49. paid → shipping → 200
-PATCH http://localhost:8080/admin/orders/CMD-HWLLXN/status
-Authorization: Bearer 3c06995beac15385763fc706bb1f6718ab154c1e30652466df1f4934f3b82a04
-Content-Type: application/json
-
-{"status": "shipping"}
-
-### 50. shipping → paid → 409 (not allowed)
-PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "paid"}
-
-### 51. shipping → delivered → 200
-PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "delivered"}
-
-### 52. delivered → cancelled → 409 (final state)
-PATCH http://localhost:8080/admin/orders/CMD-XXXXXX/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "cancelled", "reason": "test"}
-
-### 53. Cancel without reason (another paid order) → 400
-PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "cancelled"}
-
-### 54. Cancel with reason → 200
-PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "cancelled", "reason": "Rupture fournisseur"}
-
-### 55. Unknown status → 400
-PATCH http://localhost:8080/admin/orders/CMD-YYYYYY/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "lost"}
-
-### 56. Unknown order → 404
-PATCH http://localhost:8080/admin/orders/CMD-000000/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "shipping"}
-
-### 57. Admin creates order for a client → 201, status pending
-POST http://localhost:8080/admin/orders
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"user_email": "client@test.fr", "items": [{"product_id": "PDT-XXXXXX", "quantity": 2}, {"product_id": "PDT-XXXXXX", "quantity": 1}]}
-
-### 58. Unknown user → 404
-POST http://localhost:8080/admin/orders
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"user_email": "nobody@test.fr", "items": [{"product_id": "PDT-XXXXXX", "quantity": 1}]}
-
-### 59. No items → 400
-POST http://localhost:8080/admin/orders
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"user_email": "client@test.fr", "items": []}
-
-### 60. pending → paid → 200
-PATCH http://localhost:8080/admin/orders/CMD-NEW/status
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"status": "paid"}
-
-### Demo 1. Login admin
-POST http://localhost:8080/auth/login
-Content-Type: application/json
-
-{"email": "admin@test.fr", "password": "adminmdp123"}
-
-### Demo 2. Create demo client (active)
-POST http://localhost:8080/admin/users
-Authorization: Bearer 4917fb210ab47b665f4a43c6131f532a2eeedb69fb17794b2e0b636c6907ed10
-Content-Type: application/json
-
-{"email": "client@test.fr", "password": "client1234", "role": "user"}
+### 19e. Token du client → 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token_user}}
 
 ### ---------- ADMIN: MODIFIER EMAIL / MOT DE PASSE ----------
 
 ### U1. Changer l'email → 200
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
 {"email": "nouveau@test.fr"}
 
 ### U2. Email déjà pris → 409
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"email": "admin@test.fr"}
+{"email": "{{adminEmail}}"}
 
 ### U3. Email invalide → 400
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
 {"email": "pas-un-email"}
 
-### U4. Changer le mot de passe → 200
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
-Content-Type: application/json
-
-{"password": "nouveaumdp456"}
-
-### U5. Connexion avec le nouveau mot de passe → 200 + token
-POST http://localhost:8080/auth/login
-Content-Type: application/json
-
-{"email": "nouveau@test.fr", "password": "nouveaumdp456"}
-
-### U6. Mot de passe trop court → 400
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
+### U4. Mot de passe trop court → 400
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
 {"password": "abc"}
 
-### U7. Email et mot de passe vides → 200, rien ne change
-PATCH http://localhost:8080/admin/users/<user id>
-Authorization: Bearer <token admin>
+### U5. Email et mot de passe vides → 200, rien ne change
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
 {"email": "", "password": ""}
 
-
-### ---------- MAILPIT (interface web : http://localhost:8025) ----------
-
-### M0. Liste des mails reçus par Mailpit
-GET http://localhost:8025/api/v1/messages
-
-### M1. Inscription → 201, mail "Confirme ton compte" visible dans Mailpit
-POST http://localhost:8080/auth/register
+### U6. Changer le mot de passe → 200 (révoque les tokens du client)
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"email": "mail@test.fr", "password": "motdepasse123"}
+{"password": "changeparadmin789"}
 
-### M2. Renvoi pour un compte pending → 204 + nouveau mail dans Mailpit
-POST http://localhost:8080/auth/confirm/resend
+### U7. Ancien token du client → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token_user}}
+
+### U8. Connexion avec le nouvel email et le nouveau mot de passe → 200
+# @name loginClient
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-{"email": "mail@test.fr"}
+{"email": "nouveau@test.fr", "password": "changeparadmin789"}
 
-### M3. Renvoi pour un compte inconnu → 204, aucun mail
-POST http://localhost:8080/auth/confirm/resend
+### U9. Changer seulement le rôle ou le statut → 200, ne révoque pas les tokens
+PATCH {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"email": "inconnu@test.fr"}
+{"role": "user"}
 
-### M4. Renvoi pour un compte actif (admin) → 204, aucun mail
-POST http://localhost:8080/auth/confirm/resend
+### U10. Token du client toujours valide → 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token_user}}
+
+### U11. L'admin ne peut pas se rétrograder → 400
+PATCH {{baseUrl}}/admin/users/{{adminId}}
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"email": "admin@test.fr"}
+{"role": "user"}
 
-### M5. JSON invalide → 400
-POST http://localhost:8080/auth/confirm/resend
+### U12. L'admin ne peut pas se supprimer → 400
+DELETE {{baseUrl}}/admin/users/{{adminId}}
+Authorization: Bearer {{token_admin}}
+
+### ---------- PRODUITS ET RECHERCHE ----------
+
+### 21. Créer un produit avec un token client → 403
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token_user}}
 Content-Type: application/json
 
-{ "email": }
+{"name": "Test", "category": "ramen", "price_ht": 100}
 
-### M6. Mot de passe oublié (compte actif) → 204, mail "Réinitialisation" dans Mailpit
-POST http://localhost:8080/auth/password/forgot
+### 22. Produit invalide → 400
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token_admin}}
 Content-Type: application/json
 
-{"email": "admin@test.fr"}
+{"name": "", "category": "ramen", "price_ht": 0}
+
+### 23. Tous les produits
+GET {{baseUrl}}/products
+
+### 24. Recherche par nom ou description
+GET {{baseUrl}}/products?q=porc
+
+### 25. Catégorie + intervalle TTC
+GET {{baseUrl}}/products?category=ramen&min_ttc=1000&max_ttc=2000
+
+### 26. Intervalle HT
+GET {{baseUrl}}/products?max_price=500
+
+### 27. Nombre invalide → 400
+GET {{baseUrl}}/products?min_ttc=abc
+
+### 28. Intervalle invalide → 400
+GET {{baseUrl}}/products?min_ttc=2000&max_ttc=1000
+
+### 29. Aucun résultat → []
+GET {{baseUrl}}/products?q=pizza
+
+### ---------- PANIER ----------
+
+### 30. Panier (créé au premier appel, identifiant BSK-XXXXXX)
+GET {{baseUrl}}/basket
+Authorization: Bearer {{token_user}}
+
+### 31. Ajouter un article
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{ramenId}}", "quantity": 1}
+
+### 32. Ajouter le même article → quantité 2
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{ramenId}}", "quantity": 1}
+
+### 33. Modifier la quantité → 5
+PUT {{baseUrl}}/basket/items/{{ramenId}}
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"quantity": 5}
+
+### 34. Produit inconnu → 404
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "PDT-000000", "quantity": 1}
+
+### 35. Quantité 0 à l'ajout → 400
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{ramenId}}", "quantity": 0}
+
+### 35b. Quantité supérieure à 99 → 400
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{theId}}", "quantity": 100}
+
+### 36. Supprimer un article
+DELETE {{baseUrl}}/basket/items/{{ramenId}}
+Authorization: Bearer {{token_user}}
+
+### 37. Sans token → 401
+GET {{baseUrl}}/basket
+
+### ---------- PAIEMENT ----------
+
+### 36b. Remettre un article dans le panier avant de payer
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{ramenId}}", "quantity": 1}
+
+### 41. Mauvais numéro de carte (Luhn) → 400
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4241", "expiry": "12/30", "cvc": "123"}
+
+### 42. Carte expirée → 400
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "01/24", "cvc": "123"}
+
+### 43. CVC invalide → 400
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "12"}
+
+### 38. Paiement valide → 201, identifiant CMD-XXXXXX
+# @name checkout
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
+
+### 39. Le panier est maintenant vide
+GET {{baseUrl}}/basket
+Authorization: Bearer {{token_user}}
+
+### 40. Paiement avec un panier vide → 400
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
+
+### ---------- COMMANDES (CLIENT) ----------
+
+### 44. Mes commandes
+GET {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+
+### 45. Un autre utilisateur ne voit que ses commandes → 200 (ou [])
+GET {{baseUrl}}/orders
+Authorization: Bearer {{loginTestC.response.body.$.token}}
+
+### 46. Sans token → 401
+GET {{baseUrl}}/orders
+
+### ---------- ADMIN: COMMANDES ----------
+
+### 47. Admin: toutes les commandes
+GET {{baseUrl}}/admin/orders
+Authorization: Bearer {{token_admin}}
+
+### 48. Client sur une route admin → 403
+GET {{baseUrl}}/admin/orders
+Authorization: Bearer {{token_user}}
+
+### 49. paid → shipping → 200
+PATCH {{baseUrl}}/admin/orders/{{orderId}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "shipping"}
+
+### 50. shipping → paid → 409 (interdit)
+PATCH {{baseUrl}}/admin/orders/{{orderId}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "paid"}
+
+### 51. shipping → delivered → 200
+PATCH {{baseUrl}}/admin/orders/{{orderId}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "delivered"}
+
+### 52. delivered → cancelled → 409 (état final)
+PATCH {{baseUrl}}/admin/orders/{{orderId}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "cancelled", "reason": "test"}
+
+### 52b. Préparer une deuxième commande payée: ajouter un article
+POST {{baseUrl}}/basket/items
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"product_id": "{{theId}}", "quantity": 2}
+
+### 52c. Payer la deuxième commande → 201
+# @name checkout2
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"card_number": "4242 4242 4242 4242", "expiry": "12/30", "cvc": "123"}
+
+### 53. Annulation sans raison → 400
+PATCH {{baseUrl}}/admin/orders/{{order2Id}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "cancelled"}
+
+### 54. Annulation avec raison → 200
+PATCH {{baseUrl}}/admin/orders/{{order2Id}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "cancelled", "reason": "Rupture fournisseur"}
+
+### 54b. Le client voit la raison d'annulation
+GET {{baseUrl}}/orders
+Authorization: Bearer {{token_user}}
+
+### 55. Statut inconnu → 400
+PATCH {{baseUrl}}/admin/orders/{{order2Id}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "lost"}
+
+### 56. Commande inconnue → 404
+PATCH {{baseUrl}}/admin/orders/CMD-000000/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "shipping"}
+
+### 57. L'admin crée une commande pour un client → 201, statut pending
+# @name adminOrder
+POST {{baseUrl}}/admin/orders
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"user_email": "nouveau@test.fr", "items": [{"product_id": "{{ramenId}}", "quantity": 2}, {"product_id": "{{gyozaId}}", "quantity": 1}]}
+
+### 58. Client inconnu → 404
+POST {{baseUrl}}/admin/orders
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"user_email": "nobody@test.fr", "items": [{"product_id": "{{ramenId}}", "quantity": 1}]}
+
+### 59. Aucun article → 400
+POST {{baseUrl}}/admin/orders
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"user_email": "nouveau@test.fr", "items": []}
+
+### 60. pending → paid → 200
+PATCH {{baseUrl}}/admin/orders/{{adminOrderId}}/status
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"status": "paid"}
+
+### ---------- ADMIN: UTILISATEURS ----------
+
+### A1. Liste des utilisateurs → 200
+GET {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+
+### A2. Création d'un client → 201
+# @name createTemp
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "temp@test.fr", "password": "temp12345", "role": "user"}
+
+### A3. Email déjà utilisé → 409
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "temp@test.fr", "password": "temp12345", "role": "user"}
+
+### A4. Email invalide → 400
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "mauvais", "password": "temp12345", "role": "user"}
+
+### A5. Client sur une route admin → 403
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_user}}
+Content-Type: application/json
+
+{"email": "x@test.fr", "password": "client1234", "role": "user"}
+
+### A6. Supprimer un utilisateur sans commande → 204
+DELETE {{baseUrl}}/admin/users/{{createTemp.response.body.$.id}}
+Authorization: Bearer {{token_admin}}
+
+### A7. Supprimer un utilisateur qui a des commandes → 409
+DELETE {{baseUrl}}/admin/users/{{clientId}}
+Authorization: Bearer {{token_admin}}
+
+### A8. Utilisateur inconnu → 404
+DELETE {{baseUrl}}/admin/users/999999
+Authorization: Bearer {{token_admin}}
+
+### ---------- MAILPIT (interface web: http://localhost:8025) ----------
+
+### M0. Liste des mails reçus
+GET {{mailpit}}/api/v1/messages
+
+### M1. Mails envoyés à lucas@test.fr
+GET {{mailpit}}/api/v1/search?query=to:lucas@test.fr
+
+### M2. Supprimer tous les mails
+DELETE {{mailpit}}/api/v1/messages
