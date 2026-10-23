@@ -56,10 +56,29 @@ func (s *UserAdminService) Create(ctx context.Context, email, password, role str
 	return user, nil
 }
 
-func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, role, status string) (domain.User, error) {
+func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, email, password, role, status string) (domain.User, error) {
 	user, err := s.users.FindByID(ctx, id)
 	if err != nil {
 		return domain.User{}, err
+	}
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email != "" {
+		addr, err := mail.ParseAddress(email)
+		if err != nil || addr.Address != email {
+			return domain.User{}, domain.ErrInvalidInput
+		}
+		user.Email = email
+	}
+	if password != "" {
+		if len(password) < 8 || len(password) > 72 {
+			return domain.User{}, domain.ErrInvalidInput
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return domain.User{}, fmt.Errorf("hash password: %w", err)
+		}
+		user.PasswordHash = string(hash)
 	}
 
 	if role != "" {

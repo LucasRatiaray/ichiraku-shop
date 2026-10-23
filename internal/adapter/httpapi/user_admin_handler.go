@@ -39,8 +39,10 @@ type adminCreateUserRequest struct {
 }
 
 type adminUpdateUserRequest struct {
-	Role   string `json:"role"`
-	Status string `json:"status"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+	Status   string `json:"status"`
 }
 
 func writeUserError(w http.ResponseWriter, err error) {
@@ -104,7 +106,7 @@ func (h *UserAdminHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.users.Update(r.Context(), actor.ID, id, req.Role, req.Status)
+	user, err := h.users.Update(r.Context(), actor.ID, id, req.Email, req.Password, req.Role, req.Status)
 	if err != nil {
 		writeUserError(w, err)
 		return

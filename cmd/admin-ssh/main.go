@@ -38,7 +38,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("SSH server listening on :23234")
+	log.Println("SSH server listening on :23235")
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}

@@ -400,3 +400,53 @@ Authorization: Bearer 4917fb210ab47b665f4a43c6131f532a2eeedb69fb17794b2e0b636c69
 Content-Type: application/json
 
 {"email": "client@test.fr", "password": "client1234", "role": "user"}
+
+### ---------- ADMIN: MODIFIER EMAIL / MOT DE PASSE ----------
+
+### U1. Changer l'email → 200
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"email": "nouveau@test.fr"}
+
+### U2. Email déjà pris → 409
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"email": "admin@test.fr"}
+
+### U3. Email invalide → 400
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"email": "pas-un-email"}
+
+### U4. Changer le mot de passe → 200
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"password": "nouveaumdp456"}
+
+### U5. Connexion avec le nouveau mot de passe → 200 + token
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{"email": "nouveau@test.fr", "password": "nouveaumdp456"}
+
+### U6. Mot de passe trop court → 400
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"password": "abc"}
+
+### U7. Email et mot de passe vides → 200, rien ne change
+PATCH http://localhost:8080/admin/users/<user id>
+Authorization: Bearer <token admin>
+Content-Type: application/json
+
+{"email": "", "password": ""}

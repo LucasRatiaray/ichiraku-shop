@@ -3,6 +3,7 @@ package admin
 import (
 	"errors"
 	"fmt"
+	"net/mail"
 	"strconv"
 	"strings"
 
@@ -135,15 +136,49 @@ func newCreateUserForm() *huh.Form {
 	)
 }
 
-func newUserActionForm(users []apiclient.AdminUser) *huh.Form {
+func optionalEmail(s string) error {
+	email := strings.ToLower(strings.TrimSpace(s))
+	if email == "" {
+		return nil
+	}
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return errors.New("email invalide")
+	}
+	return nil
+}
+
+func optionalPassword(s string) error {
+	if s == "" {
+		return nil
+	}
+	return validatePassword(s)
+}
+
+func userOptions(users []apiclient.AdminUser) []huh.Option[string] {
 	opts := make([]huh.Option[string], 0, len(users))
 	for _, user := range users {
 		label := fmt.Sprintf("#%d %s (%s, %s)", user.ID, user.Email, roleLabel(user.Role), userStatusLabel(user.Status))
 		opts = append(opts, huh.NewOption(label, strconv.FormatInt(user.ID, 10)))
 	}
+	return opts
+}
+
+func newEditUserForm(users []apiclient.AdminUser) *huh.Form {
 	return ui.NewForm(
 		huh.NewGroup(
-			huh.NewSelect[string]().Key("user").Title("Utilisateur").Options(opts...),
+			huh.NewSelect[string]().Key("user").Title("Utilisateur").Options(userOptions(users)...),
+			huh.NewInput().Key("email").Title("Nouvel email (vide = inchangé)").Validate(optionalEmail),
+			huh.NewInput().Key("password").Title("Nouveau mot de passe (vide = inchangé)").EchoMode(huh.EchoModePassword).Validate(optionalPassword),
+			huh.NewConfirm().Key("ok").Title("Confirmer la modification ?"),
+		),
+	)
+}
+
+func newUserActionForm(users []apiclient.AdminUser) *huh.Form {
+	return ui.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Key("user").Title("Utilisateur").Options(userOptions(users)...),
 			huh.NewSelect[string]().Key("action").Title("Action").Options(
 				huh.NewOption("Confirmer le compte", "confirm"),
 				huh.NewOption("Réactiver", "enable"),

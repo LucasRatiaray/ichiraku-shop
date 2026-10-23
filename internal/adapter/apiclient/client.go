@@ -344,8 +344,10 @@ type adminCreateUserRequest struct {
 }
 
 type adminUpdateUserRequest struct {
-	Role   string `json:"role,omitempty"`
-	Status string `json:"status,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+	Role     string `json:"role,omitempty"`
+	Status   string `json:"status,omitempty"`
 }
 
 func (c *Client) ListUsers(ctx context.Context, token string) ([]AdminUser, error) {
@@ -360,10 +362,10 @@ func (c *Client) CreateUser(ctx context.Context, token, email, password, role st
 	return user, err
 }
 
-func (c *Client) UpdateUser(ctx context.Context, token string, id int64, role, status string) (AdminUser, error) {
+func (c *Client) UpdateUser(ctx context.Context, token string, id int64, email, password, role, status string) (AdminUser, error) {
 	var user AdminUser
 	path := "/admin/users/" + strconv.FormatInt(id, 10)
-	err := c.do(ctx, http.MethodPatch, path, token, adminUpdateUserRequest{Role: role, Status: status}, &user)
+	err := c.do(ctx, http.MethodPatch, path, token, adminUpdateUserRequest{Email: email, Password: password, Role: role, Status: status}, &user)
 	return user, err
 }
 

@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -23,6 +24,7 @@ const (
 	screenUsers
 	screenCreateUser
 	screenUserAction
+	screenEditUser
 )
 
 type Model struct {
@@ -93,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenOrders
 			return m, nil
 		}
-		if (m.screen == screenCreateUser || m.screen == screenUserAction) && msg.String() == "esc" {
+		if (m.screen == screenCreateUser || m.screen == screenUserAction || m.screen == screenEditUser) && msg.String() == "esc" {
 			m.err = ""
 			m.screen = screenUsers
 			return m, nil
@@ -135,6 +137,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.info = ""
 				m.screen = screenUserAction
 				m.form = newUserActionForm(m.users)
+				return m, m.form.Init()
+			case "e":
+				if len(m.users) == 0 {
+					return m, nil
+				}
+				m.err = ""
+				m.info = ""
+				m.screen = screenEditUser
+				m.form = newEditUserForm(m.users)
 				return m, m.form.Init()
 			case "r":
 				m.info = ""
@@ -318,6 +329,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.startLoading(userActionCmd(m.api, m.token, m.form.GetString("user"), m.form.GetString("action")))
+
+	case screenEditUser:
+		email := m.form.GetString("email")
+		password := m.form.GetString("password")
+		if strings.TrimSpace(email) == "" && password == "" {
+			m.screen = screenUsers
+			m.info = "Aucune modification."
+			return m, nil
+		}
+		if !m.form.GetBool("ok") {
+			m.screen = screenUsers
+			return m, nil
+		}
+		return m.startLoading(editUserCmd(m.api, m.token, m.form.GetString("user"), email, password))
 	}
 
 	return m, cmd
@@ -343,6 +368,8 @@ func (s screen) title() string {
 		return "Créer un utilisateur"
 	case screenUserAction:
 		return "Action utilisateur"
+	case screenEditUser:
+		return "Modifier un compte"
 	}
 	return ""
 }
@@ -363,11 +390,11 @@ func (m Model) View() tea.View {
 		help = "s changer un statut • r rafraîchir • esc retour • ctrl+c quitter"
 	case screenUsers:
 		s = renderUsers(m.users, contentWidth)
-		help = "c créer • a action (confirmer, rôle, désactiver, supprimer) • r rafraîchir • esc retour"
+		help = "c créer • e modifier • a action (confirmer, rôle, désactiver, supprimer) • r rafraîchir • esc retour"
 	default:
 		s = m.form.WithWidth(contentWidth).View()
 		switch m.screen {
-		case screenCreateProduct, screenChangeStatus, screenCreateUser, screenUserAction:
+		case screenCreateProduct, screenChangeStatus, screenCreateUser, screenUserAction, screenEditUser:
 			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
 		case screenCreateOrder:
 			help = "↑/↓ naviguer • espace cocher • entrée valider • esc retour • ctrl+c quitter"

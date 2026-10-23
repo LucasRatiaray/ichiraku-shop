@@ -132,6 +132,17 @@ func createUserCmd(api *apiclient.Client, token, email, password, role string) t
 	}
 }
 
+func editUserCmd(api *apiclient.Client, token, idStr, email, password string) tea.Cmd {
+	return func() tea.Msg {
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			return userActionMsg{err: err}
+		}
+		_, err = api.UpdateUser(context.Background(), token, id, email, password, "", "")
+		return userActionMsg{info: "Compte modifié.", err: err}
+	}
+}
+
 func userActionCmd(api *apiclient.Client, token, idStr, action string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -143,16 +154,16 @@ func userActionCmd(api *apiclient.Client, token, idStr, action string) tea.Cmd {
 		case "delete":
 			return userActionMsg{info: "Compte supprimé.", err: api.DeleteUser(ctx, token, id)}
 		case "confirm", "enable":
-			_, err = api.UpdateUser(ctx, token, id, "", "active")
+			_, err = api.UpdateUser(ctx, token, id, "", "", "", "active")
 			return userActionMsg{info: "Compte activé.", err: err}
 		case "disable":
-			_, err = api.UpdateUser(ctx, token, id, "", "disabled")
+			_, err = api.UpdateUser(ctx, token, id, "", "", "", "disabled")
 			return userActionMsg{info: "Compte désactivé.", err: err}
 		case "role_admin":
-			_, err = api.UpdateUser(ctx, token, id, "admin", "")
+			_, err = api.UpdateUser(ctx, token, id, "", "", "admin", "")
 			return userActionMsg{info: "Rôle admin attribué.", err: err}
 		case "role_user":
-			_, err = api.UpdateUser(ctx, token, id, "user", "")
+			_, err = api.UpdateUser(ctx, token, id, "", "", "user", "")
 			return userActionMsg{info: "Rôle client attribué.", err: err}
 		}
 		return userActionMsg{info: "Aucune action."}
