@@ -77,3 +77,7 @@ func renderOrders(orders []apiclient.Order, width int) string {
 	}
 	return s.String()
 }
+
+func renderAccount(email string, width int) string {
+	return ui.Card(width, ui.NameStyle.Render("Mon compte"), "", ui.HelpStyle.Render("Email")+"  "+email)
+}

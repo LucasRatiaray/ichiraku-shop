@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -29,6 +30,8 @@ const (
 	screenEditBasket
 	screenPayment
 	screenOrders
+	screenAccount
+	screenChangePassword
 )
 
 type Model struct {
@@ -104,6 +107,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenBasket
 			return m, nil
 		}
+		if m.screen == screenChangePassword && msg.String() == "esc" {
+			m.err = ""
+			m.screen = screenAccount
+			return m, nil
+		}
 		if !m.loading && msg.String() == "esc" {
 			switch m.screen {
 			case screenLogin, screenRegister, screenConfirm, screenResend, screenForgot, screenReset:
@@ -112,15 +120,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenMenu
 				m.form = newMenuForm()
 				return m, m.form.Init()
-			case screenBasket, screenOrders:
+			case screenBasket, screenOrders, screenAccount:
 				m.err = ""
 				m.info = ""
 				m.screen = screenResults
 				return m, nil
 			}
 		}
-		if !m.loading && (m.screen == screenResults || m.screen == screenBasket || m.screen == screenOrders) {
+		if !m.loading && (m.screen == screenResults || m.screen == screenBasket || m.screen == screenOrders || m.screen == screenAccount) {
 			switch msg.String() {
+			case "u":
+				m.err = ""
+				m.info = ""
+				m.screen = screenAccount
+				return m, nil
 			case "s":
 				m.err = ""
 				m.info = ""
@@ -178,6 +191,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.screen == screenOrders {
+			return m, nil
+		}
+		if m.screen == screenAccount {
+			if msg.String() == "p" {
+				m.err = ""
+				m.info = ""
+				m.screen = screenChangePassword
+				m.form = newChangePasswordForm()
+				return m, m.form.Init()
+			}
 			return m, nil
 		}
 
@@ -322,6 +345,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.info = fmt.Sprintf("Commande %s payée — %s TTC", msg.order.ID, ui.FormatEuros(msg.order.TotalTTC))
 		return m.loadCatalog()
 
+	case changePasswordResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err.Error()
+			m.form = newChangePasswordForm()
+			return m, m.form.Init()
+		}
+		m.token = msg.token
+		m.err = ""
+		m.info = "Mot de passe modifié."
+		m.screen = screenAccount
+		return m, nil
+
 	case ordersResultMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -374,6 +410,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case screenLogin:
+		m.email = strings.ToLower(strings.TrimSpace(m.form.GetString("email")))
 		return m.startLoading(loginCmd(m.api, m.form.GetString("email"), m.form.GetString("password")))
 
 	case screenRegister:
@@ -410,6 +447,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenPayment:
 		return m.startLoading(checkoutCmd(m.api, m.token,
 			m.form.GetString("card_number"), m.form.GetString("expiry"), m.form.GetString("cvc")))
+
+	case screenChangePassword:
+		return m.startLoading(changePasswordCmd(m.api, m.token,
+			m.form.GetString("current"), m.form.GetString("new")))
 	}
 
 	return m, cmd
@@ -445,6 +486,10 @@ func (s screen) title() string {
 		return "Paiement"
 	case screenOrders:
 		return "Mes commandes"
+	case screenAccount:
+		return "Compte"
+	case screenChangePassword:
+		return "Changer le mot de passe"
 	}
 	return ""
 }
@@ -455,11 +500,11 @@ func (m Model) tabs() []ui.Tab {
 		count += it.Quantity
 	}
 	return []ui.Tab{
-		{Label: "ichiraku"},
 		{Key: "s", Label: "boutique", Active: m.screen == screenResults || m.screen == screenSearch || m.screen == screenAddToBasket},
 		{Key: "c", Label: "panier", Detail: fmt.Sprintf("%s [%d]", ui.FormatEuros(m.basket.TotalTTC), count),
 			Active: m.screen == screenBasket || m.screen == screenEditBasket || m.screen == screenPayment},
 		{Key: "o", Label: "commandes", Active: m.screen == screenOrders},
+		{Key: "u", Label: "compte", Active: m.screen == screenAccount || m.screen == screenChangePassword},
 		{Key: "q", Label: "quitter"},
 	}
 }
@@ -480,6 +525,9 @@ func (m Model) View() tea.View {
 	case screenOrders:
 		s = renderOrders(m.orders, contentWidth)
 		hints = []ui.Hint{{Key: "esc", Label: "retour"}, quit}
+	case screenAccount:
+		s = renderAccount(m.email, contentWidth)
+		hints = []ui.Hint{{Key: "p", Label: "changer le mot de passe"}, {Key: "esc", Label: "retour"}, quit}
 	default:
 		s = m.form.WithWidth(contentWidth).View()
 	}
@@ -495,7 +543,7 @@ func (m Model) View() tea.View {
 	}
 
 	if m.token != "" {
-		return ui.Shop(m.width, m.height, m.tabs(), s, hints...)
+		return ui.Shop(m.width, m.height, "Ichiraku Shop", m.tabs(), s, hints...)
 	}
 	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
 	if m.screen != screenMenu {

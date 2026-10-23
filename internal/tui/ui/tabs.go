@@ -19,52 +19,51 @@ type Hint struct {
 	Label string
 }
 
-func tabContent(t Tab) string {
-	if t.Key == "" {
-		return NameStyle.Render(t.Label)
+func tabContent(t Tab, compact bool) string {
+	key := NameStyle
+	if compact && t.Active {
+		key = TitleStyle
+	}
+	if compact {
+		return strings.TrimSpace(key.Render(t.Key) + " " + NameStyle.Render(t.Detail))
 	}
 	label := DimStyle.Render(t.Label)
 	if t.Active {
 		label = TitleStyle.Render(t.Label)
 	}
-	s := NameStyle.Render(t.Key) + " " + label
+	s := key.Render(t.Key) + " " + label
 	if t.Detail != "" {
 		s += " " + NameStyle.Render(t.Detail)
 	}
 	return s
 }
 
-func Tabs(width int, tabs []Tab) string {
+func tabsBar(tabs []Tab, compact bool) string {
 	last := len(tabs) - 1
-	contents := make([]string, len(tabs))
-	natural := 1
-	for i, t := range tabs {
-		contents[i] = tabContent(t)
-		natural += lipgloss.Width(contents[i]) + 3
-	}
-	extra := max(width-natural, 0)
-
 	cells := make([]string, len(tabs))
-	for i, c := range contents {
+	for i, t := range tabs {
+		content := tabContent(t, compact)
 		border := lipgloss.NormalBorder()
 		if i > 0 {
 			border.TopLeft = "┬"
 			border.BottomLeft = "┴"
-		}
-		w := lipgloss.Width(c) + 3 + extra/len(tabs)
-		if i == last {
-			w += 1 + extra%len(tabs)
 		}
 		cells[i] = lipgloss.NewStyle().
 			Border(border).
 			BorderRight(i == last).
 			BorderForeground(Line).
 			Padding(0, 1).
-			Align(lipgloss.Center).
-			Width(w).
-			Render(c)
+			Render(content)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, cells...)
+}
+
+func Tabs(width int, tabs []Tab) string {
+	bar := tabsBar(tabs, false)
+	if lipgloss.Width(bar) > width {
+		bar = tabsBar(tabs, true)
+	}
+	return lipgloss.NewStyle().MaxWidth(width).Render(bar)
 }
 
 func HelpBar(width int, hints []Hint) string {
@@ -75,12 +74,14 @@ func HelpBar(width int, hints []Hint) string {
 	return lipgloss.PlaceHorizontal(width, lipgloss.Center, strings.Join(parts, "   "))
 }
 
-func Shop(width, height int, tabs []Tab, body string, hints ...Hint) tea.View {
+func Shop(width, height int, title string, tabs []Tab, body string, hints ...Hint) tea.View {
 	inner := ContentWidth(width)
 	block := lipgloss.NewStyle().Width(pageWidth(width)).Padding(0, pagePadding)
 	rule := lipgloss.NewStyle().Foreground(Line).Render(strings.Repeat("─", pageWidth(width)))
 
-	head := block.Render(Tabs(inner, tabs))
+	heading := lipgloss.PlaceHorizontal(inner, lipgloss.Center, TitleStyle.Render("🍜 "+title))
+	bar := lipgloss.PlaceHorizontal(inner, lipgloss.Center, Tabs(inner, tabs))
+	head := block.Render(heading + "\n" + bar)
 	shipping := lipgloss.PlaceHorizontal(inner, lipgloss.Center, DimStyle.Render("Livraison gratuite"))
 	foot := block.Render(shipping) + "\n" + rule + "\n" + block.Render(HelpBar(inner, hints))
 	main := block.PaddingTop(1).Height(max(height-lipgloss.Height(head)-lipgloss.Height(foot), 0)).Render(body)

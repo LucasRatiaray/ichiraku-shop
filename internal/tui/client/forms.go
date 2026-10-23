@@ -152,3 +152,26 @@ func required(s string) error {
 	}
 	return nil
 }
+
+func validateNewPassword(s string) error {
+	if len(s) < 8 || len(s) > 72 {
+		return errors.New("8 à 72 caractères")
+	}
+	return nil
+}
+
+func newChangePasswordForm() *huh.Form {
+	var next string
+	return ui.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("current").Title("Mot de passe actuel").EchoMode(huh.EchoModePassword).Validate(required),
+			huh.NewInput().Key("new").Title("Nouveau mot de passe (8 à 72 caractères)").EchoMode(huh.EchoModePassword).Value(&next).Validate(validateNewPassword),
+			huh.NewInput().Key("confirm").Title("Confirmation du nouveau mot de passe").EchoMode(huh.EchoModePassword).Validate(func(s string) error {
+				if s != next {
+					return errors.New("la confirmation est différente")
+				}
+				return nil
+			}),
+		),
+	)
+}

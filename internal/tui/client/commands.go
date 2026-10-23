@@ -147,3 +147,15 @@ func listOrdersCmd(api *apiclient.Client, token string) tea.Cmd {
 		return ordersResultMsg{orders: orders, err: err}
 	}
 }
+
+type changePasswordResultMsg struct {
+	token string
+	err   error
+}
+
+func changePasswordCmd(api *apiclient.Client, token, current, next string) tea.Cmd {
+	return func() tea.Msg {
+		newToken, err := api.ChangePassword(context.Background(), token, current, next)
+		return changePasswordResultMsg{token: newToken, err: err}
+	}
+}
