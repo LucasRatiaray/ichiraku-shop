@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'disabled')),
     token_version INT NOT NULL DEFAULT 0,
+    failed_logins INT NOT NULL DEFAULT 0,
+    locked_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -14,7 +16,8 @@ CREATE TABLE IF NOT EXISTS verification_codes (
     code TEXT NOT NULL,
     purpose TEXT NOT NULL CHECK (purpose IN ('confirm', 'reset')),
     expires_at TIMESTAMPTZ NOT NULL,
-    used_at TIMESTAMPTZ
+    used_at TIMESTAMPTZ,
+    attempts INT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS products (

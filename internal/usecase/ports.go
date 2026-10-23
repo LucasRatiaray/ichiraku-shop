@@ -3,6 +3,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 )
@@ -13,13 +14,16 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id int64) (domain.User, error)
 	Update(ctx context.Context, user domain.User) error
 	IncrementTokenVersion(ctx context.Context, id int64) error
+	RecordFailedLogin(ctx context.Context, id int64, maxAttempts int, lockedUntil time.Time) error
+	ResetFailedLogins(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]domain.User, error)
 	Delete(ctx context.Context, id int64) error
 }
 
 type VerificationCodeRepository interface {
 	Create(ctx context.Context, code *domain.VerificationCode) error
-	FindValid(ctx context.Context, userID int64, code string, purpose domain.CodePurpose) (domain.VerificationCode, error)
+	FindLatestActive(ctx context.Context, userID int64, purpose domain.CodePurpose) (domain.VerificationCode, error)
+	IncrementAttempts(ctx context.Context, id int64, maxAttempts int) (int, error)
 	MarkUsed(ctx context.Context, id int64) error
 }
 

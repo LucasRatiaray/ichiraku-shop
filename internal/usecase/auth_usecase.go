@@ -3,6 +3,7 @@ package usecase
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
@@ -88,6 +89,42 @@ func (s *AuthService) newCode(ctx context.Context, userID int64, purpose domain.
 	return code, nil
 }
 
+func (s *AuthService) verifyCode(ctx context.Context, userID int64, code string, purpose domain.CodePurpose) error {
+	vc, err := s.codes.FindLatestActive(ctx, userID, purpose)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("verify code: %w", err)
+	}
+
+	attempts, err := s.codes.IncrementAttempts(ctx, vc.ID, MaxCodeAttempts)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("verify code: %w", err)
+	}
+
+	if subtle.ConstantTimeCompare([]byte(vc.Code), []byte(code)) != 1 {
+		if attempts >= MaxCodeAttempts {
+			if err := s.codes.MarkUsed(ctx, vc.ID); err != nil && !errors.Is(err, domain.ErrNotFound) {
+				return fmt.Errorf("verify code: %w", err)
+			}
+		}
+		return domain.ErrInvalidCode
+	}
+
+	err = s.codes.MarkUsed(ctx, vc.ID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrInvalidCode
+	}
+	if err != nil {
+		return fmt.Errorf("verify code: %w", err)
+	}
+	return nil
+}
+
 func (s *AuthService) ResendConfirmation(ctx context.Context, email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
@@ -130,20 +167,8 @@ func (s *AuthService) Confirm(ctx context.Context, email, code string) error {
 		return domain.ErrInvalidCode
 	}
 
-	vc, err := s.codes.FindValid(ctx, user.ID, code, domain.PurposeConfirm)
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.ErrInvalidCode
-	}
-	if err != nil {
-		return fmt.Errorf("confirm: %w", err)
-	}
-
-	err = s.codes.MarkUsed(ctx, vc.ID)
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.ErrInvalidCode
-	}
-	if err != nil {
-		return fmt.Errorf("confirm: %w", err)
+	if err := s.verifyCode(ctx, user.ID, code, domain.PurposeConfirm); err != nil {
+		return err
 	}
 
 	user.Status = domain.StatusActive
@@ -164,12 +189,25 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", fmt.Errorf("login: %w", err)
 	}
 
+	if isLocked(user, time.Now()) {
+		return "", domain.ErrTooManyAttempts
+	}
+
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		if err := s.users.RecordFailedLogin(ctx, user.ID, MaxLoginAttempts, time.Now().Add(LockDuration)); err != nil {
+			return "", fmt.Errorf("login: %w", err)
+		}
 		return "", domain.ErrInvalidCredentials
 	}
 	if err != nil {
 		return "", fmt.Errorf("login: %w", err)
+	}
+
+	if user.FailedLogins > 0 || user.LockedUntil != nil {
+		if err := s.users.ResetFailedLogins(ctx, user.ID); err != nil {
+			return "", fmt.Errorf("login: %w", err)
+		}
 	}
 
 	if user.Status == domain.StatusPending {
@@ -251,20 +289,8 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPasswor
 		return fmt.Errorf("reset password: %w", err)
 	}
 
-	vc, err := s.codes.FindValid(ctx, user.ID, code, domain.PurposeReset)
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.ErrInvalidCode
-	}
-	if err != nil {
-		return fmt.Errorf("reset password: %w", err)
-	}
-
-	err = s.codes.MarkUsed(ctx, vc.ID)
-	if errors.Is(err, domain.ErrNotFound) {
-		return domain.ErrInvalidCode
-	}
-	if err != nil {
-		return fmt.Errorf("reset password: %w", err)
+	if err := s.verifyCode(ctx, user.ID, code, domain.PurposeReset); err != nil {
+		return err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
@@ -277,6 +303,9 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPasswor
 		return fmt.Errorf("reset password: %w", err)
 	}
 	if err := s.users.IncrementTokenVersion(ctx, user.ID); err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+	if err := s.users.ResetFailedLogins(ctx, user.ID); err != nil {
 		return fmt.Errorf("reset password: %w", err)
 	}
 

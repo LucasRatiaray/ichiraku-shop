@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/usecase"
@@ -37,10 +38,10 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users WHERE email = $1`
+	query := `SELECT id, email, password_hash, role, status, token_version, failed_logins, locked_until, created_at FROM users WHERE email = $1`
 	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.FailedLogins, &user.LockedUntil, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -52,10 +53,10 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users WHERE id = $1`
+	query := `SELECT id, email, password_hash, role, status, token_version, failed_logins, locked_until, created_at FROM users WHERE id = $1`
 	var user domain.User
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.FailedLogins, &user.LockedUntil, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -106,8 +107,27 @@ func (r *UserRepository) IncrementTokenVersion(ctx context.Context, id int64) er
 	return nil
 }
 
+func (r *UserRepository) RecordFailedLogin(ctx context.Context, id int64, maxAttempts int, lockedUntil time.Time) error {
+	query := `UPDATE users SET
+		failed_logins = CASE WHEN failed_logins + 1 >= $2 THEN 0 ELSE failed_logins + 1 END,
+		locked_until = CASE WHEN failed_logins + 1 >= $2 THEN $3 ELSE locked_until END
+		WHERE id = $1`
+
+	if _, err := r.db.ExecContext(ctx, query, id, maxAttempts, lockedUntil); err != nil {
+		return fmt.Errorf("record failed login: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepository) ResetFailedLogins(ctx context.Context, id int64) error {
+	if _, err := r.db.ExecContext(ctx, `UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("reset failed logins: %w", err)
+	}
+	return nil
+}
+
 func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
-	query := `SELECT id, email, password_hash, role, status, token_version, created_at FROM users ORDER BY id`
+	query := `SELECT id, email, password_hash, role, status, token_version, failed_logins, locked_until, created_at FROM users ORDER BY id`
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -118,7 +138,7 @@ func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
 	var users []domain.User
 	for rows.Next() {
 		var user domain.User
-		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.CreatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.Status, &user.TokenVersion, &user.FailedLogins, &user.LockedUntil, &user.CreatedAt); err != nil {
 			return nil, fmt.Errorf("list users: %w", err)
 		}
 		users = append(users, user)

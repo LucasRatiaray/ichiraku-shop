@@ -17,6 +17,7 @@
 
 @confirmCode = 000000
 @resetCode = 000000
+@limitCode = 000000
 
 ### =====================================================================
 ### Ordre conseillé : exécuter de haut en bas sur une base vierge.
@@ -688,6 +689,81 @@ Authorization: Bearer {{token_admin}}
 ### A8. Utilisateur inconnu → 404
 DELETE {{baseUrl}}/admin/users/999999
 Authorization: Bearer {{token_admin}}
+
+### ---------- LIMITE DE TENTATIVES: CODES ----------
+### La limite est de 5 essais par code. Au 5e échec le code est invalidé.
+### Ces requêtes se lancent avec Mailpit (http://localhost:8025) pour lire les codes.
+
+### T1. Inscription d'un compte de test → 201 (lire le code dans Mailpit et le mettre dans @limitCode)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{"email": "essai@test.fr", "password": "motdepasse123"}
+
+### T2. Mauvais code → 400 (exécuter cette requête 5 fois de suite)
+POST {{baseUrl}}/auth/confirm
+Content-Type: application/json
+
+{"email": "essai@test.fr", "code": "111111"}
+
+### T3. Le BON code (@limitCode) est maintenant refusé → 400
+POST {{baseUrl}}/auth/confirm
+Content-Type: application/json
+
+{"email": "essai@test.fr", "code": "{{limitCode}}"}
+
+### T4. Renvoi d'un nouveau code → 204 (lire le nouveau code dans Mailpit et le mettre dans @limitCode)
+POST {{baseUrl}}/auth/confirm/resend
+Content-Type: application/json
+
+{"email": "essai@test.fr"}
+
+### T5. Le nouveau code fonctionne → 204
+POST {{baseUrl}}/auth/confirm
+Content-Type: application/json
+
+{"email": "essai@test.fr", "code": "{{limitCode}}"}
+
+### ---------- LIMITE DE TENTATIVES: MOT DE PASSE ----------
+### 5 mauvais mots de passe verrouillent le compte pendant 15 minutes.
+
+### T6. Créer un compte actif pour le test → 201
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "verrou@test.fr", "password": "motdepasse123", "role": "user"}
+
+### T7. Mauvais mot de passe → 401 (exécuter cette requête 5 fois de suite)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "verrou@test.fr", "password": "mauvais123"}
+
+### T8. Le BON mot de passe est refusé pendant le verrou → 429 "too many attempts, try again later"
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "verrou@test.fr", "password": "motdepasse123"}
+
+### T9. Même un mauvais mot de passe est refusé sans être compté → 429
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "verrou@test.fr", "password": "mauvais123"}
+
+### Remise à zéro manuelle du verrou (à lancer entre T9 et T10) :
+###   docker compose exec db sh
+###   psql -U $POSTGRES_USER -d $POSTGRES_DB
+###   UPDATE users SET failed_logins = 0, locked_until = NULL WHERE email = 'verrou@test.fr';
+### Pour voir l'état du compte :
+###   SELECT email, failed_logins, locked_until FROM users WHERE email = 'verrou@test.fr';
+
+### T10. Après la remise à zéro, le bon mot de passe fonctionne → 200
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "verrou@test.fr", "password": "motdepasse123"}
 
 ### ---------- MAILPIT (interface web: http://localhost:8025) ----------
 

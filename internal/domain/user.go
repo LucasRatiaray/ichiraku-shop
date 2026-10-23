@@ -24,5 +24,7 @@ type User struct {
 	Role         Role
 	Status       Status
 	TokenVersion int
+	FailedLogins int
+	LockedUntil  *time.Time
 	CreatedAt    time.Time
 }

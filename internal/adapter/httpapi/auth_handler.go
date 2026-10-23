@@ -148,6 +148,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, domain.ErrAccountNotConfirmed):
 		writeError(w, http.StatusForbidden, "account not confirmed")
 		return
+	case errors.Is(err, domain.ErrTooManyAttempts):
+		writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
+		return
 	case err != nil:
 		log.Printf("login: %v", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

@@ -30,18 +30,32 @@ func (r *VerificationCodeRepository) Create(ctx context.Context, vc *domain.Veri
 	return nil
 }
 
-func (r *VerificationCodeRepository) FindValid(ctx context.Context, userID int64, code string, purpose domain.CodePurpose) (domain.VerificationCode, error) {
-	query := `SELECT id, user_id, code, purpose, expires_at, used_at FROM verification_codes WHERE user_id = $1 AND code = $2 AND purpose = $3 AND used_at IS NULL AND expires_at > now() ORDER BY id DESC LIMIT 1`
+func (r *VerificationCodeRepository) FindLatestActive(ctx context.Context, userID int64, purpose domain.CodePurpose) (domain.VerificationCode, error) {
+	query := `SELECT id, user_id, code, purpose, expires_at, used_at FROM verification_codes WHERE user_id = $1 AND purpose = $2 AND used_at IS NULL AND expires_at > now() ORDER BY id DESC LIMIT 1`
 	var vc domain.VerificationCode
 
-	err := r.db.QueryRowContext(ctx, query, userID, code, purpose).Scan(&vc.ID, &vc.UserID, &vc.Code, &vc.Purpose, &vc.ExpiresAt, &vc.UsedAt)
+	err := r.db.QueryRowContext(ctx, query, userID, purpose).Scan(&vc.ID, &vc.UserID, &vc.Code, &vc.Purpose, &vc.ExpiresAt, &vc.UsedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.VerificationCode{}, domain.ErrNotFound
 		}
-		return domain.VerificationCode{}, fmt.Errorf("find valid code: %w", err)
+		return domain.VerificationCode{}, fmt.Errorf("find latest active code: %w", err)
 	}
 	return vc, nil
+}
+
+func (r *VerificationCodeRepository) IncrementAttempts(ctx context.Context, id int64, maxAttempts int) (int, error) {
+	query := `UPDATE verification_codes SET attempts = attempts + 1 WHERE id = $1 AND used_at IS NULL AND attempts < $2 RETURNING attempts`
+
+	var attempts int
+	err := r.db.QueryRowContext(ctx, query, id, maxAttempts).Scan(&attempts)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, domain.ErrNotFound
+		}
+		return 0, fmt.Errorf("increment code attempts: %w", err)
+	}
+	return attempts, nil
 }
 
 func (r *VerificationCodeRepository) MarkUsed(ctx context.Context, id int64) error {
