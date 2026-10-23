@@ -350,3 +350,59 @@ func (s *AuthService) EnsureAdmin(ctx context.Context, email, password string) e
 	}
 	return nil
 }
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID int64, current, next string) (string, error) {
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+
+	if isLocked(user, time.Now()) {
+		return "", domain.ErrTooManyAttempts
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		if err := s.users.RecordFailedLogin(ctx, user.ID, MaxLoginAttempts, time.Now().Add(LockDuration)); err != nil {
+			return "", fmt.Errorf("change password: %w", err)
+		}
+		return "", domain.ErrInvalidCredentials
+	}
+	if err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+
+	if err := validatePassword(next); err != nil {
+		return "", err
+	}
+	if next == current {
+		return "", domain.ErrInvalidInput
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+
+	user.PasswordHash = string(hash)
+	if err := s.users.Update(ctx, user); err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+	if err := s.users.ResetFailedLogins(ctx, user.ID); err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+	if err := s.users.IncrementTokenVersion(ctx, user.ID); err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+
+	user, err = s.users.FindByID(ctx, user.ID)
+	if err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+
+	token, err := signToken(s.jwtSecret, user, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("change password: %w", err)
+	}
+	return token, nil
+}

@@ -238,3 +238,43 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	user, ok := userFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	token, err := h.auth.ChangePassword(r.Context(), user.ID, req.CurrentPassword, req.NewPassword)
+	switch {
+	case errors.Is(err, domain.ErrTooManyAttempts):
+		writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
+		return
+	case errors.Is(err, domain.ErrInvalidCredentials):
+		writeError(w, http.StatusUnauthorized, "current password is incorrect")
+		return
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, "new password must be 8 to 72 characters and different from the current one")
+		return
+	case err != nil:
+		log.Printf("change password: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, loginResponse{Token: token})
+}

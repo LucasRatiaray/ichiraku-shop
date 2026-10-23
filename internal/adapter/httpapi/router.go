@@ -23,6 +23,8 @@ func NewRouter(auth *AuthHandler, products *ProductHandler, baskets *BasketHandl
 
 	mux.HandleFunc("POST /auth/password/reset", auth.ResetPassword)
 
+	mux.HandleFunc("POST /auth/password/change", auth.RequireAuth(auth.ChangePassword))
+
 	mux.HandleFunc("POST /auth/logout", auth.RequireAuth(auth.Logout))
 
 	mux.HandleFunc("POST /admin/products", auth.RequireAdmin(products.Create))

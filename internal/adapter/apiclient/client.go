@@ -378,3 +378,17 @@ func (c *Client) DeleteUser(ctx context.Context, token string, id int64) error {
 	path := "/admin/users/" + strconv.FormatInt(id, 10)
 	return c.do(ctx, http.MethodDelete, path, token, nil, nil)
 }
+
+func (c *Client) ChangePassword(ctx context.Context, token, current, next string) (string, error) {
+	body := map[string]string{
+		"current_password": current,
+		"new_password":     next,
+	}
+	var res struct {
+		Token string `json:"token"`
+	}
+	if err := c.do(ctx, http.MethodPost, "/auth/password/change", token, body, &res); err != nil {
+		return "", err
+	}
+	return res.Token, nil
+}
