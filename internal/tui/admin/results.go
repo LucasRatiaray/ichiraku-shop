@@ -8,7 +8,7 @@ import (
 	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
-func renderOrders(orders []apiclient.Order) string {
+func renderOrders(orders []apiclient.Order, width int) string {
 	var s strings.Builder
 	if len(orders) == 0 {
 		s.WriteString(ui.InfoStyle.Render("Aucune commande."))
@@ -16,19 +16,21 @@ func renderOrders(orders []apiclient.Order) string {
 		return s.String()
 	}
 
+	inner := ui.CardInner(width)
 	for _, o := range orders {
-		status := ui.InfoStyle.Render(ui.OrderStatusLabel(o.Status))
-		if o.Status == "cancelled" {
-			status = ui.ErrStyle.Render(ui.OrderStatusLabel(o.Status))
-		}
-		fmt.Fprintf(&s, "%s  %s  %s  %s\n", ui.NameStyle.Render(o.ID), o.UserEmail, ui.FormatDate(o.CreatedAt), status)
+		left := ui.NameStyle.Render(o.ID) + ui.HelpStyle.Render("  "+ui.FormatDate(o.CreatedAt))
+
+		body := []string{ui.HelpStyle.Render(o.UserEmail)}
 		if o.CancelReason != "" {
-			fmt.Fprintf(&s, "    Raison : %s\n", o.CancelReason)
+			body = append(body, ui.ErrStyle.Render("Raison : "+o.CancelReason))
 		}
 		for _, it := range o.Items {
-			fmt.Fprintf(&s, "    %d × %s  %s\n", it.Quantity, it.Name, ui.FormatEuros(it.TotalTTC))
+			body = append(body, ui.Row(inner, fmt.Sprintf("%d × %s", it.Quantity, it.Name), ui.FormatEuros(it.TotalTTC)))
 		}
-		fmt.Fprintf(&s, "    Total : %s TTC\n\n", ui.FormatEuros(o.TotalTTC))
+		body = append(body, ui.Row(inner, ui.HelpStyle.Render("Total TTC"), ui.PriceStyle.Render(ui.FormatEuros(o.TotalTTC))))
+
+		s.WriteString(ui.Card(width, left, ui.OrderStatusBadge(o.Status), strings.Join(body, "\n")))
+		s.WriteString("\n")
 	}
 	return s.String()
 }
@@ -53,14 +55,17 @@ func roleLabel(r string) string {
 	return "client"
 }
 
-func renderUsers(users []apiclient.AdminUser) string {
+func renderUsers(users []apiclient.AdminUser, width int) string {
 	var s strings.Builder
 	for _, user := range users {
-		status := ui.InfoStyle.Render(userStatusLabel(user.Status))
+		badge := ui.Badge(userStatusLabel(user.Status), ui.Green)
 		if user.Status != "active" {
-			status = ui.ErrStyle.Render(userStatusLabel(user.Status))
+			badge = ui.Badge(userStatusLabel(user.Status), ui.Red)
 		}
-		fmt.Fprintf(&s, "#%-4d %s  %s  %s\n", user.ID, ui.NameStyle.Render(user.Email), roleLabel(user.Role), status)
+		left := ui.NameStyle.Render(user.Email)
+		body := ui.HelpStyle.Render(fmt.Sprintf("#%d · %s", user.ID, roleLabel(user.Role)))
+		s.WriteString(ui.Card(width, left, badge, body))
+		s.WriteString("\n")
 	}
 	return s.String()
 }

@@ -30,7 +30,7 @@ func requiredPrice(s string) error {
 }
 
 func newLoginForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email admin"),
 			huh.NewInput().Key("password").Title("Mot de passe").EchoMode(huh.EchoModePassword),
@@ -39,7 +39,7 @@ func newLoginForm() *huh.Form {
 }
 
 func newCreateProductForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("name").Title("Nom").Validate(required),
 			huh.NewInput().Key("description").Title("Description (optionnelle)"),
@@ -50,7 +50,7 @@ func newCreateProductForm() *huh.Form {
 }
 
 func newHomeForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Key("choice").Title("Administration").Options(
 				huh.NewOption("Créer un produit", "create_product"),
@@ -85,7 +85,7 @@ func newChangeStatusForm(orders []apiclient.Order) *huh.Form {
 		statusOpts = append(statusOpts, huh.NewOption(ui.OrderStatusLabel(s), s))
 	}
 
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Key("order").Title("Commande").Options(orderOpts...),
 			huh.NewSelect[string]().Key("status").Title("Nouveau statut").Options(statusOpts...),
@@ -100,7 +100,7 @@ func newCreateOrderForm(products []apiclient.Product) *huh.Form {
 		opts = append(opts, huh.NewOption(fmt.Sprintf("%s — %s TTC", p.Name, ui.FormatEuros(p.PriceTTC)), p.ID))
 	}
 
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email du client").Validate(required),
 			huh.NewMultiSelect[string]().Key("products").Title("Produits").Options(opts...).
@@ -123,7 +123,7 @@ func validatePassword(s string) error {
 }
 
 func newCreateUserForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email").Validate(required),
 			huh.NewInput().Key("password").Title("Mot de passe initial").EchoMode(huh.EchoModePassword).Validate(validatePassword),
@@ -141,7 +141,7 @@ func newUserActionForm(users []apiclient.AdminUser) *huh.Form {
 		label := fmt.Sprintf("#%d %s (%s, %s)", user.ID, user.Email, roleLabel(user.Role), userStatusLabel(user.Status))
 		opts = append(opts, huh.NewOption(label, strconv.FormatInt(user.ID, 10)))
 	}
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Key("user").Title("Utilisateur").Options(opts...),
 			huh.NewSelect[string]().Key("action").Title("Action").Options(

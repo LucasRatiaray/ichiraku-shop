@@ -29,6 +29,8 @@ type Model struct {
 	api      *apiclient.Client
 	form     *huh.Form
 	screen   screen
+	width    int
+	height   int
 	loading  bool
 	token    string
 	err      string
@@ -45,7 +47,7 @@ func New(api *apiclient.Client) Model {
 		api:     api,
 		screen:  screenLogin,
 		form:    newLoginForm(),
-		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(ui.TitleStyle)),
 	}
 }
 
@@ -66,6 +68,10 @@ func (m Model) goHome() (Model, tea.Cmd) {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
 	case spinner.TickMsg:
 		if !m.loading {
 			return m, nil
@@ -317,24 +323,49 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() tea.View {
-	s := ui.TitleStyle.Render("🍜 Ichiraku Shop — Admin") + "\n\n"
-
-	if m.loading {
-		s += m.spinner.View() + " Chargement…\n"
-		return tea.NewView(s)
+func (s screen) title() string {
+	switch s {
+	case screenLogin:
+		return "Connexion"
+	case screenHome:
+		return "Administration"
+	case screenCreateProduct:
+		return "Créer un produit"
+	case screenOrders:
+		return "Commandes"
+	case screenChangeStatus:
+		return "Changer un statut"
+	case screenCreateOrder:
+		return "Créer une commande"
+	case screenUsers:
+		return "Utilisateurs"
+	case screenCreateUser:
+		return "Créer un utilisateur"
+	case screenUserAction:
+		return "Action utilisateur"
 	}
+	return ""
+}
+
+func (m Model) View() tea.View {
+	if m.loading {
+		return ui.Page(m.width, m.height, "Ichiraku Admin", m.screen.title(),
+			m.spinner.View()+" Chargement…", "ctrl+c quitter")
+	}
+
+	contentWidth := ui.ContentWidth(m.width)
+	var s string
 
 	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
 	switch m.screen {
 	case screenOrders:
-		s += renderOrders(m.orders)
+		s = renderOrders(m.orders, contentWidth)
 		help = "s changer un statut • r rafraîchir • esc retour • ctrl+c quitter"
 	case screenUsers:
-		s += renderUsers(m.users)
+		s = renderUsers(m.users, contentWidth)
 		help = "c créer • a action (confirmer, rôle, désactiver, supprimer) • r rafraîchir • esc retour"
 	default:
-		s += m.form.View()
+		s = m.form.WithWidth(contentWidth).View()
 		switch m.screen {
 		case screenCreateProduct, screenChangeStatus, screenCreateUser, screenUserAction:
 			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
@@ -350,6 +381,5 @@ func (m Model) View() tea.View {
 		s += "\n" + ui.InfoStyle.Render("✓ "+m.info) + "\n"
 	}
 
-	s += "\n" + ui.HelpStyle.Render(help)
-	return tea.NewView(s)
+	return ui.Page(m.width, m.height, "Ichiraku Admin", m.screen.title(), s, help)
 }

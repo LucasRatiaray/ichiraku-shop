@@ -13,7 +13,7 @@ import (
 )
 
 func newMenuForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Key("choice").
@@ -27,22 +27,8 @@ func newMenuForm() *huh.Form {
 	)
 }
 
-func newHomeForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Key("choice").Title("Que veux-tu faire ?").Options(
-				huh.NewOption("Catalogue", "catalog"),
-				huh.NewOption("Panier", "cart"),
-				huh.NewOption("Mes commandes", "orders"),
-				huh.NewOption("Se déconnecter", "logout"),
-				huh.NewOption("Quitter", "quit"),
-			),
-		),
-	)
-}
-
 func newLoginForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email"),
 			huh.NewInput().Key("password").Title("Mot de passe").EchoMode(huh.EchoModePassword),
@@ -51,7 +37,7 @@ func newLoginForm() *huh.Form {
 }
 
 func newRegisterForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email"),
 			huh.NewInput().Key("password").Title("Mot de passe (8 caractères min.)").EchoMode(huh.EchoModePassword),
@@ -60,7 +46,7 @@ func newRegisterForm() *huh.Form {
 }
 
 func newConfirmForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("code").Title("Code reçu par email"),
 		),
@@ -68,7 +54,7 @@ func newConfirmForm() *huh.Form {
 }
 
 func newForgotForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("email").Title("Email du compte"),
 		),
@@ -76,7 +62,7 @@ func newForgotForm() *huh.Form {
 }
 
 func newResetForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("code").Title("Code reçu par email"),
 			huh.NewInput().Key("password").Title("Nouveau mot de passe (8 caractères min.)").EchoMode(huh.EchoModePassword),
@@ -85,23 +71,23 @@ func newResetForm() *huh.Form {
 }
 
 func newSearchForm() *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("q").Title("Nom ou description").Placeholder("vide = tout"),
 			huh.NewInput().Key("category").Title("Catégorie"),
-			huh.NewInput().Key("min_ht").Title("Prix HT min (€)").Validate(validatePrice),
-			huh.NewInput().Key("max_ht").Title("Prix HT max (€)").Validate(validatePrice),
-			huh.NewInput().Key("min_ttc").Title("Prix TTC min (€)").Validate(validatePrice),
-			huh.NewInput().Key("max_ttc").Title("Prix TTC max (€)").Validate(validatePrice),
+			huh.NewInput().Key("min_ht").Title("Prix HT min (€)").Validate(ui.ValidatePrice),
+			huh.NewInput().Key("max_ht").Title("Prix HT max (€)").Validate(ui.ValidatePrice),
+			huh.NewInput().Key("min_ttc").Title("Prix TTC min (€)").Validate(ui.ValidatePrice),
+			huh.NewInput().Key("max_ttc").Title("Prix TTC max (€)").Validate(ui.ValidatePrice),
 		),
 	)
 }
 
 func filterFromSearchForm(form *huh.Form) domain.ProductFilter {
-	minHT, _ := parseEuros(form.GetString("min_ht"))
-	maxHT, _ := parseEuros(form.GetString("max_ht"))
-	minTTC, _ := parseEuros(form.GetString("min_ttc"))
-	maxTTC, _ := parseEuros(form.GetString("max_ttc"))
+	minHT, _ := ui.ParseEuros(form.GetString("min_ht"))
+	maxHT, _ := ui.ParseEuros(form.GetString("max_ht"))
+	minTTC, _ := ui.ParseEuros(form.GetString("min_ttc"))
+	maxTTC, _ := ui.ParseEuros(form.GetString("max_ttc"))
 
 	return domain.ProductFilter{
 		Query:       form.GetString("q"),
@@ -128,7 +114,7 @@ func newAddToBasketForm(products []apiclient.Product) *huh.Form {
 	for _, p := range products {
 		opts = append(opts, huh.NewOption(fmt.Sprintf("%s — %s TTC", p.Name, ui.FormatEuros(p.PriceTTC)), p.ID))
 	}
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Key("product").Title("Produit").Options(opts...),
 			huh.NewInput().Key("quantity").Title("Quantité").Placeholder("1").Validate(validateQuantity(1)),
@@ -141,7 +127,7 @@ func newEditBasketForm(items []apiclient.BasketItem) *huh.Form {
 	for _, it := range items {
 		opts = append(opts, huh.NewOption(fmt.Sprintf("%s (%d)", it.Name, it.Quantity), it.ProductID))
 	}
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Key("product").Title("Ligne à modifier").Options(opts...),
 			huh.NewInput().Key("quantity").Title("Nouvelle quantité (0 = supprimer)").Validate(validateQuantity(0)),
@@ -150,7 +136,7 @@ func newEditBasketForm(items []apiclient.BasketItem) *huh.Form {
 }
 
 func newPaymentForm(total int64) *huh.Form {
-	return huh.NewForm(
+	return ui.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Key("card_number").Title("Numéro de carte").Placeholder("4242 4242 4242 4242").Validate(required),
 			huh.NewInput().Key("expiry").Title("Expiration").Placeholder("MM/AA").Validate(required),

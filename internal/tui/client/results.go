@@ -8,27 +8,29 @@ import (
 	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
-func renderProducts(products []apiclient.Product) string {
+func renderProducts(products []apiclient.Product, width int) string {
 	if len(products) == 0 {
-		return infoStyle.Render("Aucun produit trouvé.") + "\n"
+		return ui.InfoStyle.Render("Aucun produit trouvé.") + "\n"
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d produit(s)\n\n", len(products))
+	b.WriteString(ui.HelpStyle.Render(fmt.Sprintf("%d produit(s)", len(products))))
+	b.WriteString("\n")
 	for _, p := range products {
-		fmt.Fprintf(&b, "%s  %s  [%s]\n", helpStyle.Render(p.ID), nameStyle.Render(p.Name), p.Category)
-		fmt.Fprintf(&b, "    %s HT · %s TTC\n", formatEuros(p.PriceHT), formatEuros(p.PriceTTC))
+		body := ui.HelpStyle.Render(fmt.Sprintf("%s · %s · %s HT", p.ID, p.Category, ui.FormatEuros(p.PriceHT)))
 		if p.Description != "" {
-			fmt.Fprintf(&b, "    %s\n", helpStyle.Render(p.Description))
+			body += "\n" + p.Description
 		}
+		b.WriteString(ui.Card(width, ui.NameStyle.Render(p.Name), ui.PriceStyle.Render(ui.FormatEuros(p.PriceTTC)+" TTC"), body))
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
-func renderBasket(b apiclient.Basket) string {
+func renderBasket(b apiclient.Basket, width int) string {
 	var s strings.Builder
-	fmt.Fprintf(&s, "Panier %s\n\n", ui.HelpStyle.Render(b.ID))
+	s.WriteString(ui.HelpStyle.Render("Panier " + b.ID))
+	s.WriteString("\n")
 
 	if len(b.Items) == 0 {
 		s.WriteString(ui.InfoStyle.Render("Ton panier est vide."))
@@ -37,15 +39,19 @@ func renderBasket(b apiclient.Basket) string {
 	}
 
 	for _, it := range b.Items {
-		fmt.Fprintf(&s, "%s  ×%d  %s\n", ui.NameStyle.Render(it.Name), it.Quantity, ui.FormatEuros(it.TotalTTC))
-		fmt.Fprintf(&s, "    %s · %s TTC l'unité\n", ui.HelpStyle.Render(it.ProductID), ui.FormatEuros(it.UnitPriceTTC))
+		left := ui.NameStyle.Render(it.Name) + ui.HelpStyle.Render(fmt.Sprintf("  ×%d", it.Quantity))
+		body := ui.HelpStyle.Render(fmt.Sprintf("%s · %s TTC l'unité", it.ProductID, ui.FormatEuros(it.UnitPriceTTC)))
+		s.WriteString(ui.Card(width, left, ui.PriceStyle.Render(ui.FormatEuros(it.TotalTTC)), body))
+		s.WriteString("\n")
 	}
-	fmt.Fprintf(&s, "\nLivraison : gratuite\n")
-	fmt.Fprintf(&s, "Total TTC : %s\n", ui.NameStyle.Render(ui.FormatEuros(b.TotalTTC)))
+	s.WriteString(ui.Row(width, ui.HelpStyle.Render("Livraison"), "gratuite"))
+	s.WriteString("\n")
+	s.WriteString(ui.Row(width, ui.NameStyle.Render("Total TTC"), ui.PriceStyle.Render(ui.FormatEuros(b.TotalTTC))))
+	s.WriteString("\n")
 	return s.String()
 }
 
-func renderOrders(orders []apiclient.Order) string {
+func renderOrders(orders []apiclient.Order, width int) string {
 	var s strings.Builder
 	if len(orders) == 0 {
 		s.WriteString(ui.InfoStyle.Render("Aucune commande pour l'instant."))
@@ -53,19 +59,21 @@ func renderOrders(orders []apiclient.Order) string {
 		return s.String()
 	}
 
+	inner := ui.CardInner(width)
 	for _, o := range orders {
-		status := ui.InfoStyle.Render(ui.OrderStatusLabel(o.Status))
-		if o.Status == "cancelled" {
-			status = ui.ErrStyle.Render(ui.OrderStatusLabel(o.Status))
-		}
-		fmt.Fprintf(&s, "%s  %s  %s\n", ui.NameStyle.Render(o.ID), ui.FormatDate(o.CreatedAt), status)
+		left := ui.NameStyle.Render(o.ID) + ui.HelpStyle.Render("  "+ui.FormatDate(o.CreatedAt))
+
+		var body []string
 		if o.CancelReason != "" {
-			fmt.Fprintf(&s, "    Raison : %s\n", o.CancelReason)
+			body = append(body, ui.ErrStyle.Render("Raison : "+o.CancelReason))
 		}
 		for _, it := range o.Items {
-			fmt.Fprintf(&s, "    %d × %s  %s\n", it.Quantity, it.Name, ui.FormatEuros(it.TotalTTC))
+			body = append(body, ui.Row(inner, fmt.Sprintf("%d × %s", it.Quantity, it.Name), ui.FormatEuros(it.TotalTTC)))
 		}
-		fmt.Fprintf(&s, "    Total : %s TTC\n\n", ui.FormatEuros(o.TotalTTC))
+		body = append(body, ui.Row(inner, ui.HelpStyle.Render("Total TTC"), ui.PriceStyle.Render(ui.FormatEuros(o.TotalTTC))))
+
+		s.WriteString(ui.Card(width, left, ui.OrderStatusBadge(o.Status), strings.Join(body, "\n")))
+		s.WriteString("\n")
 	}
 	return s.String()
 }

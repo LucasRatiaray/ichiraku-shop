@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"time"
 	_ "time/tzdata"
 )
@@ -18,6 +19,22 @@ func OrderStatusLabel(status string) string {
 		return label
 	}
 	return status
+}
+
+var statusColors = map[string]color.Color{
+	"pending":   Yellow,
+	"paid":      Blue,
+	"shipping":  Accent,
+	"delivered": Green,
+	"cancelled": Red,
+}
+
+func OrderStatusBadge(status string) string {
+	bg, ok := statusColors[status]
+	if !ok {
+		bg = Muted
+	}
+	return Badge(OrderStatusLabel(status), bg)
 }
 
 var paris = loadParis()

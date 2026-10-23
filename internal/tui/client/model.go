@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/adapter/apiclient"
+	"github.com/LucasRatiaray/ichiraku-shop/internal/domain"
 	"github.com/LucasRatiaray/ichiraku-shop/internal/tui/ui"
 )
 
@@ -20,7 +21,6 @@ const (
 	screenConfirm
 	screenForgot
 	screenReset
-	screenHome
 	screenSearch
 	screenResults
 	screenAddToBasket
@@ -34,6 +34,8 @@ type Model struct {
 	api      *apiclient.Client
 	form     *huh.Form
 	screen   screen
+	width    int
+	height   int
 	loading  bool
 	token    string
 	email    string
@@ -51,7 +53,7 @@ func New(api *apiclient.Client) Model {
 		api:     api,
 		screen:  screenMenu,
 		form:    newMenuForm(),
-		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(ui.TitleStyle)),
 	}
 }
 
@@ -64,14 +66,16 @@ func (m Model) startLoading(cmd tea.Cmd) (Model, tea.Cmd) {
 	return m, tea.Batch(cmd, m.spinner.Tick) // lance le spinner et la commande en parallèle
 }
 
-func (m Model) goHome() (Model, tea.Cmd) {
-	m.screen = screenHome
-	m.form = newHomeForm()
-	return m, m.form.Init() // réinitialise le formulaire pour l'écran d'accueil
+func (m Model) loadCatalog() (Model, tea.Cmd) {
+	return m.startLoading(searchCmd(m.api, domain.ProductFilter{}))
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
 	case spinner.TickMsg:
 		if !m.loading {
 			return m, nil
@@ -86,7 +90,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.screen == screenSearch && msg.String() == "esc" {
 			m.err = ""
-			return m.goHome()
+			m.screen = screenResults
+			return m, nil
 		}
 		if m.screen == screenAddToBasket && msg.String() == "esc" {
 			m.err = ""
@@ -98,6 +103,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenBasket
 			return m, nil
 		}
+		if !m.loading && (m.screen == screenResults || m.screen == screenBasket || m.screen == screenOrders) {
+			switch msg.String() {
+			case "s":
+				m.err = ""
+				m.info = ""
+				return m.loadCatalog()
+			case "c":
+				m.err = ""
+				m.info = ""
+				return m.startLoading(getBasketCmd(m.api, m.token))
+			case "o":
+				m.err = ""
+				m.info = ""
+				return m.startLoading(listOrdersCmd(m.api, m.token))
+			case "q":
+				m.quitting = true
+				return m.startLoading(logoutCmd(m.api, m.token))
+			}
+		}
 		if m.screen == screenResults {
 			switch msg.String() {
 			case "a":
@@ -107,13 +131,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenAddToBasket
 				m.form = newAddToBasketForm(m.products)
 				return m, m.form.Init()
-			case "n":
+			case "/":
 				m.screen = screenSearch
 				m.form = newSearchForm()
 				return m, m.form.Init()
-			case "esc", "q":
-				m.err = ""
-				return m.goHome()
 			}
 			return m, nil
 		}
@@ -137,19 +158,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenEditBasket
 				m.form = newEditBasketForm(m.basket.Items)
 				return m, m.form.Init()
-			case "esc", "q":
-				m.err = ""
-				m.info = ""
-				return m.goHome()
 			}
 			return m, nil
 		}
 		if m.screen == screenOrders {
-			switch msg.String() {
-			case "esc", "q":
-				m.err = ""
-				return m.goHome()
-			}
 			return m, nil
 		}
 
@@ -163,7 +175,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.token = msg.token
 		m.err = ""
 		m.info = ""
-		return m.goHome()
+		return m.startLoading(getBasketCmd(m.api, m.token))
 
 	case registerResultMsg:
 		m.loading = false
@@ -235,6 +247,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		if msg.err != nil {
 			m.err = msg.err.Error()
+			m.screen = screenSearch
 			m.form = newSearchForm()
 			return m, m.form.Init()
 		}
@@ -245,6 +258,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case basketResultMsg:
 		m.loading = false
+		if m.screen == screenLogin {
+			m.basket = msg.basket
+			return m.loadCatalog()
+		}
 		if msg.err != nil {
 			m.err = msg.err.Error()
 			m.info = ""
@@ -256,7 +273,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.form = newEditBasketForm(m.basket.Items)
 				return m, m.form.Init()
 			}
-			return m.goHome()
+			m.screen = screenResults
+			return m, nil
 		}
 		m.err = ""
 		m.basket = msg.basket
@@ -273,13 +291,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = ""
 		m.basket = apiclient.Basket{}
 		m.info = fmt.Sprintf("Commande %s payée — %s TTC", msg.order.ID, ui.FormatEuros(msg.order.TotalTTC))
-		return m.goHome()
+		return m.loadCatalog()
 
 	case ordersResultMsg:
 		m.loading = false
 		if msg.err != nil {
 			m.err = msg.err.Error()
-			return m.goHome()
+			m.screen = screenResults
+			return m, nil
 		}
 		m.err = ""
 		m.orders = msg.orders
@@ -338,25 +357,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenReset:
 		return m.startLoading(resetCmd(m.api, m.email, m.form.GetString("code"), m.form.GetString("password")))
 
-	case screenHome:
-		m.err = ""
-		m.info = ""
-		switch m.form.GetString("choice") {
-		case "catalog":
-			m.screen = screenSearch
-			m.form = newSearchForm()
-			return m, m.form.Init()
-		case "cart":
-			return m.startLoading(getBasketCmd(m.api, m.token))
-		case "orders":
-			return m.startLoading(listOrdersCmd(m.api, m.token))
-		case "logout":
-			return m.startLoading(logoutCmd(m.api, m.token))
-		case "quit":
-			m.quitting = true
-			return m.startLoading(logoutCmd(m.api, m.token))
-		}
-
 	case screenSearch:
 		return m.startLoading(searchCmd(m.api, filterFromSearchForm(m.form)))
 
@@ -378,40 +378,89 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() tea.View {
-	s := ui.TitleStyle.Render("🍜 Ichiraku Shop") + "\n\n"
-
-	if m.loading {
-		s += m.spinner.View() + " Chargement…\n"
-		return tea.NewView(s)
+func (s screen) title() string {
+	switch s {
+	case screenMenu:
+		return "Bienvenue"
+	case screenLogin:
+		return "Connexion"
+	case screenRegister:
+		return "Créer un compte"
+	case screenConfirm:
+		return "Confirmation du compte"
+	case screenForgot:
+		return "Mot de passe oublié"
+	case screenReset:
+		return "Nouveau mot de passe"
+	case screenSearch:
+		return "Recherche"
+	case screenResults:
+		return "Catalogue"
+	case screenAddToBasket:
+		return "Ajouter au panier"
+	case screenBasket:
+		return "Panier"
+	case screenEditBasket:
+		return "Modifier le panier"
+	case screenPayment:
+		return "Paiement"
+	case screenOrders:
+		return "Mes commandes"
 	}
+	return ""
+}
 
-	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
+func (m Model) tabs() []ui.Tab {
+	count := 0
+	for _, it := range m.basket.Items {
+		count += it.Quantity
+	}
+	return []ui.Tab{
+		{Label: "ichiraku"},
+		{Key: "s", Label: "boutique", Active: m.screen == screenResults || m.screen == screenSearch || m.screen == screenAddToBasket},
+		{Key: "c", Label: "panier", Detail: fmt.Sprintf("%s [%d]", ui.FormatEuros(m.basket.TotalTTC), count),
+			Active: m.screen == screenBasket || m.screen == screenEditBasket || m.screen == screenPayment},
+		{Key: "o", Label: "commandes", Active: m.screen == screenOrders},
+		{Key: "q", Label: "quitter"},
+	}
+}
+
+func (m Model) View() tea.View {
+	contentWidth := ui.ContentWidth(m.width)
+	quit := ui.Hint{Key: "ctrl+c", Label: "quitter"}
+	hints := []ui.Hint{{Key: "↑/↓", Label: "naviguer"}, {Key: "entrée", Label: "valider"}, {Key: "esc", Label: "retour"}, quit}
+	var s string
+
 	switch m.screen {
 	case screenResults:
-		s += renderProducts(m.products)
-		help = "a ajouter au panier • n nouvelle recherche • esc retour • ctrl+c quitter"
+		s = renderProducts(m.products, contentWidth)
+		hints = []ui.Hint{{Key: "/", Label: "rechercher"}, {Key: "a", Label: "ajouter au panier"}, quit}
 	case screenBasket:
-		s += renderBasket(m.basket)
-		help = "p payer • m modifier une quantité • esc retour • ctrl+c quitter"
+		s = renderBasket(m.basket, contentWidth)
+		hints = []ui.Hint{{Key: "p", Label: "payer"}, {Key: "m", Label: "modifier une quantité"}, quit}
 	case screenOrders:
-		s += renderOrders(m.orders)
-		help = "esc retour • ctrl+c quitter"
+		s = renderOrders(m.orders, contentWidth)
+		hints = []ui.Hint{quit}
 	default:
-		s += m.form.View()
-		switch m.screen {
-		case screenSearch, screenAddToBasket, screenEditBasket, screenPayment:
-			help = "↑/↓ naviguer • entrée valider • esc retour • ctrl+c quitter"
-		}
+		s = m.form.WithWidth(contentWidth).View()
+	}
+	if m.loading {
+		s = m.spinner.View() + " Chargement…"
 	}
 
-	if m.err != "" {
+	if !m.loading && m.err != "" {
 		s += "\n" + ui.ErrStyle.Render("✗ "+m.err) + "\n"
 	}
-	if m.info != "" {
+	if !m.loading && m.info != "" {
 		s += "\n" + ui.InfoStyle.Render("✓ "+m.info) + "\n"
 	}
 
-	s += "\n" + ui.HelpStyle.Render(help)
-	return tea.NewView(s)
+	if m.token != "" {
+		return ui.Shop(m.width, m.height, m.tabs(), s, hints...)
+	}
+	help := "↑/↓ naviguer • entrée valider • ctrl+c quitter"
+	if m.loading {
+		help = "ctrl+c quitter"
+	}
+	return ui.Page(m.width, m.height, "Ichiraku Shop", m.screen.title(), s, help)
 }
