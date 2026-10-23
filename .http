@@ -775,3 +775,85 @@ GET {{mailpit}}/api/v1/search?query=to:lucas@test.fr
 
 ### M2. Supprimer tous les mails
 DELETE {{mailpit}}/api/v1/messages
+
+### ---------- CHANGER SON MOT DE PASSE (compte connecté) ----------
+
+### C0. Créer un compte actif pour le test (admin) → 201
+POST {{baseUrl}}/admin/users
+Authorization: Bearer {{token_admin}}
+Content-Type: application/json
+
+{"email": "change@test.fr", "password": "changeme123", "role": "user"}
+
+### C1a. Login → token A
+# @name loginChangeA
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "change@test.fr", "password": "changeme123"}
+
+### C1b. Deuxième login (attendre 1 seconde) → token B, autre session du même compte
+# @name loginChangeB
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "change@test.fr", "password": "changeme123"}
+
+### C2. Sans token → 401
+POST {{baseUrl}}/auth/password/change
+Content-Type: application/json
+
+{"current_password": "changeme123", "new_password": "nouveau12345"}
+
+### C3. Mot de passe actuel faux → 401 (compte comme un échec de connexion)
+POST {{baseUrl}}/auth/password/change
+Authorization: Bearer {{loginChangeA.response.body.$.token}}
+Content-Type: application/json
+
+{"current_password": "faux12345", "new_password": "nouveau12345"}
+
+### C4. Nouveau mot de passe trop court → 400
+POST {{baseUrl}}/auth/password/change
+Authorization: Bearer {{loginChangeA.response.body.$.token}}
+Content-Type: application/json
+
+{"current_password": "changeme123", "new_password": "abc"}
+
+### C5. Nouveau identique à l'actuel → 400
+POST {{baseUrl}}/auth/password/change
+Authorization: Bearer {{loginChangeA.response.body.$.token}}
+Content-Type: application/json
+
+{"current_password": "changeme123", "new_password": "changeme123"}
+
+### C6. Changement valide → 200 + nouveau token
+# @name changePassword
+POST {{baseUrl}}/auth/password/change
+Authorization: Bearer {{loginChangeA.response.body.$.token}}
+Content-Type: application/json
+
+{"current_password": "changeme123", "new_password": "nouveau12345"}
+
+### C7. Ancien token A (celui de la requête) → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginChangeA.response.body.$.token}}
+
+### C8. Token B (autre session du compte) → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginChangeB.response.body.$.token}}
+
+### C9. Nouveau token renvoyé par C6 → 200, la session courante reste connectée
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{changePassword.response.body.$.token}}
+
+### C10. Login avec l'ancien mot de passe → 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "change@test.fr", "password": "changeme123"}
+
+### C11. Login avec le nouveau mot de passe → 200
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{"email": "change@test.fr", "password": "nouveau12345"}
